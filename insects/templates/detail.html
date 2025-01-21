@@ -1,0 +1,221 @@
+{% extends "template_v2.html" %}
+{% block content %}
+<div style="background-color: #F5F5F5;" >
+    <div style="background-color: #F5F5F5;" class="container">
+        <div class="d-flex justify-content-center">
+            <p class="fw-bold fs-2">{{ species.vi_name }} - {{ species.name }}</p>
+        </div>
+        <div>
+            <hr>
+        </div>
+        <div class="row">
+            <div class="col-md-3">
+                <table class="table">
+                    <tr>
+                        <td class="text-center"><p>Tên khoa học: {{ species.ename }}</p></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center"><p>Scientific Classification</p></td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <img class="img-thumbnail mx-auto d-block" src="{{ MEDIA_URL }}{{species.thumbnail}}" alt="">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-justify">
+                            <p>Giới (Kingdom): {{ species.genus.family.order.class_field.phylum.kingdom.ename }}</p>
+                            <p>Ngành (Phylum): {{ species.genus.family.order.class_field.phylum.ename }}</p>
+                            <p>Lớp (Class): {{ species.genus.family.order.class_field.ename }}</p>
+                            <p>Bộ (Order): {{ species.genus.family.order.ename }}</p>
+                            <p>Họ (Family): {{ species.genus.family.ename }}</p>
+                            <p>Chi (Genus): {{ species.genus.ename }}</p>
+                            <p>Loài (Species): {{ species.ename }}</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-md-9">
+                <p class="fw-bold fs-3">Đặc điểm sinh học</p>
+                <hr>
+                <p>{{ species.characteristic|linebreaksbr }}</p>
+
+                <p class="fw-bold fs-3">Phân bố</p>
+                <hr>
+                <p>{{ species.distribution|linebreaksbr }}</p>
+
+                <p class="fw-bold fs-3">Hình thái</p>
+                <hr>
+                <p>{{ species.morphologic_feature|linebreaksbr }}</p>
+
+                <p class="fw-bold fs-3">Tập tính</p>
+                <hr>
+                <p>{{ species.behavior|linebreaksbr }}</p>
+
+                <p class="fw-bold fs-3">Biện pháp phòng ngừa</p>
+                <hr>
+                <p>{{ species.protection_method|linebreaksbr }}</p>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-center align-items-center">
+             <p class="fw-bold fs-2">Hình ảnh</p>
+        </div>
+        <div>
+            <hr>
+        </div>
+
+        <!-- Modal HTML Markup -->
+        <div id="imageModal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="imageModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="imageModalLabel"></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div id="modalContainer" style="position: relative;">
+                            <img id="modalImage" src="#" class="img-fluid">
+                            <svg id="modalSvg" style="position: absolute; top: 0; left: 0;" width="100%" height="100%">
+                                
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-3" id="image-container">
+            {% for image in images %}
+            <div class="col-sm-6 col-md-4 col-lg-3 mb-3">
+                <div class="card">
+                    <svg class="img-fluid" viewBox="0 0 {{ image.width }} {{ image.height }}" data-insect-id="{{ image.insects.insects_id }}">
+                        <image href="{{ MEDIA_URL }}{{ image.url }}" data-src="{{ MEDIA_URL }}{{ image.url }}" height="100%" width="100%" />
+                        {% for bbox in image.bboxes.all %}
+                        {% with text_x=bbox.x|add:2 text_y=bbox.y|add:15 %}
+                            <rect x="{{ bbox.x }}" y="{{ bbox.y }}" width="{{ bbox.width }}" height="{{ bbox.height }}" style="stroke:red;stroke-width:2;fill-opacity:0" />
+                            <text x="{{ text_x }}" y="{{ text_y }}" fill="red" class="bbox-text" font-size="18">{{ image.insects.name }}</text>
+                        {% endwith %}
+                        {% endfor %}
+                    </svg>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="d-flex justify-content-center">
+            <button id="load-more" class="btn btn-success">Tải thêm...</button>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+var mediaUrl = '{{ MEDIA_URL }}';
+var page_number = 2;  // Start from the second page
+var slug = '{{ species.slug }}';  // Get the slug of the current species
+
+// Existing initialization code for lazy loading images...
+
+$('#image-container').on('click', 'svg', function() {
+    // This event delegation allows all current and future SVG elements within #image-container to trigger this function
+    var imageUrl = $(this).find('image').attr('href');
+    var bboxesData = []; // Initialize an array to store bbox data
+    $(this).find('rect').each(function() {
+        var bbox = {
+            x: $(this).attr('x'),
+            y: $(this).attr('y'),
+            width: $(this).attr('width'),
+            height: $(this).attr('height'),
+            text: $(this).next('text').text() // Assuming text tag immediately follows rect tag
+        };
+        bboxesData.push(bbox);
+    });
+    var insectName = $(this).find('.bbox-text').first().text(); // Assuming the first text within svg is the insect name
+    var viewBox = $(this).attr('viewBox');
+    var insectId = $(this).data('insect-id');
+    openModal(imageUrl, bboxesData, insectName, insectId, viewBox);
+});
+
+// Existing function to open modal...
+
+$('#load-more').on('click', function() {
+    $.get('/detail/' + slug + '/load_more_images/?page=' + page_number, function(data) {
+        data.forEach(function(imageData) {
+            var imageHTML = '<div class="col-sm-6 col-md-4 col-lg-3 mb-3"><div class="card"><svg class="img-fluid" viewBox="0 0 ' + imageData.width + ' ' + imageData.height + '" data-insect-id="' + imageData.insects.insects_id + '"><image href="' + mediaUrl + imageData.url + '" data-src="' + mediaUrl + imageData.url + '" height="100%" width="100%" />';
+            imageData.bboxes.forEach(function(bbox) {
+                var adjustedX = parseInt(bbox.x) + 5;
+                var adjustedY = parseInt(bbox.y) + 20;
+                imageHTML += '<rect x="' + bbox.x + '" y="' + bbox.y + '" width="' + bbox.width + '" height="' + bbox.height + '" style="stroke:red;stroke-width:2;fill-opacity:0" />';
+                imageHTML += '<text x="' + adjustedX + '" y="' + adjustedY + '" class="bbox-text" fill="red">' + imageData.insects.ename + '</text>';
+            });
+            imageHTML += '</svg></div></div>';
+            $('#image-container').append(imageHTML);
+        });
+        page_number++;
+
+        // No need to manually observe new images for lazy loading here
+        // because the IntersectionObserver setup in the initialization code
+        // will automatically start observing them as they enter the viewport
+
+        if(!$('#chk_insect_name').is(':checked')) {
+            $('.bbox-text').hide();
+        }
+    });
+});
+});
+
+// Event listener to open modal when image is clicked
+$('svg').on('click', function() {
+    var imageUrl = $(this).find('image').attr('href');
+    var bboxesData = []; // Modify to retrieve bounding box data
+    $(this).find('rect').each(function() {
+        var bbox = {};
+        bbox.x = $(this).attr('x');
+        bbox.y = $(this).attr('y');
+        bbox.width = $(this).attr('width');
+        bbox.height = $(this).attr('height');
+        bbox.text = $(this).next('text').text(); // Get the text associated with the bounding box
+        bboxesData.push(bbox);
+    });
+    var insectName = $(this).find('.bbox-text').text(); // Get the insect name from the SVG
+    var viewBox = $(this).attr('viewBox'); // Get the viewBox from the SVG
+    var insectId = $(this).data('insect-id'); // Get the insect ID from the SVG's data attributes
+    openModal(imageUrl, bboxesData, insectName, insectId, viewBox);
+});
+
+function openModal(imageUrl, bboxesData, insectName, insectId, viewBox) {
+    var id = insectId;
+    $('#imageModalLabel').text(insectName);
+
+    // Set the original-size image in the modal
+    $('#modalImage').attr('src', imageUrl);
+
+    // Set the viewBox for the modal's SVG
+    $('#modalSvg').attr('viewBox', viewBox);
+
+    // Clear previous content from SVG
+    $('#modalSvg').empty();
+
+    // Add bounding boxes and text to the SVG
+    bboxesData.forEach(function(bbox) {
+        var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", bbox.x);
+        rect.setAttribute("y", bbox.y);
+        rect.setAttribute("width", bbox.width);
+        rect.setAttribute("height", bbox.height);
+        rect.setAttribute("style", "stroke:red;stroke-width:2;fill-opacity:0");
+        $('#modalSvg').append(rect);
+
+        var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", bbox.x);
+        text.setAttribute("y", bbox.y);
+        text.setAttribute("fill", "red");
+        text.setAttribute("font-size", "18");
+        text.textContent = bbox.text; // Display the text associated with the bounding box
+        $('#modalSvg').append(text);
+    });
+
+    $('#imageModal').modal('show');
+}
+</script>
+{% endblock %}

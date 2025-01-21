@@ -1,0 +1,78 @@
+{% extends "template_v2.html" %}
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center">
+
+    <!-- Form for selecting insect species -->
+    <form id="loadForm" method="post" enctype="multipart/form-data">
+
+        {% csrf_token %}
+        <legend class="text-center text-black fw-bold mt-3"><h1>Gán nhãn</h1></legend>
+        <div class="mb-3">
+            <label for="insectSelect" class="form-label">Chọn côn trùng</label>
+            <select class="form-select" id="insectSelect" name="insectSelect">
+                {% for species in species_list %}
+                <option value="{{ species.insects_id }}">{{ species.ename }} - {{ species.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="d-grid">
+            <button type="button" id="loadImageButton" class="btn btn-primary pt-3 pb-3">Tải hình ảnh</button>
+        </div>
+    </form>  
+    <hr>
+    
+</div>
+
+<div class="container">
+    <div class="row mt-3" id="image-container">
+        <!-- Images will be loaded here dynamically -->
+    </div>
+</div>
+
+<script>
+document.getElementById('loadImageButton').addEventListener('click', function() {
+    const insectId = document.getElementById('insectSelect').value;
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    fetch(`/Labelling/?insectId=${insectId}`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': csrfToken,
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        const imageContainer = document.getElementById('image-container');
+        imageContainer.innerHTML = ''; // Clear current images
+        data.images.forEach(image => {
+            // Construct the SVG element for each image
+            let svgContent = `<svg class="img-fluid" viewBox="0 0 ${image.width} ${image.height}" data-insect-id="${image.insectsId}">
+                                <image href="${image.url}" height="100%" width="100%"/>`;
+            image.bboxes.forEach(bbox => {
+                const textX = parseFloat(bbox.x) + 2;
+                const textY = parseFloat(bbox.y) + 15;
+                svgContent += `<rect x="${bbox.x}" y="${bbox.y}" width="${bbox.width}" height="${bbox.height}" style="stroke:red;stroke-width:2;fill-opacity:0"/>
+                                <text x="${textX}" y="${textY}" fill="red" class="bbox-text" font-size="18">${image.insectsName}</text>`;
+            });
+            svgContent += `</svg>`;
+
+            // Construct and append the card with the SVG to the image container
+            const cardHtml = `
+            <div class="col-sm-6 col-md-4 col-lg-3 mb-3 image-card" data-img-id="${image.img_id}">
+                <div class="card">
+                    ${svgContent}
+                </div>
+            </div>`;
+            imageContainer.insertAdjacentHTML('beforeend', cardHtml);
+        });
+    })
+    .catch(error => console.error('Error loading images:', error));
+});
+
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.closest('.image-card')) {
+        const imgId = e.target.closest('.image-card').dataset.imgId;
+        window.location.href = `/annotation/?imgId=${imgId}`;
+    }
+});
+</script>
+{% endblock %}

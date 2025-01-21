@@ -1,0 +1,28 @@
+{% extends "template_v2.html" %}
+{% load custom_filters %} 
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Chấp nhận đề xuất côn trùng</h2>
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">Tên côn trùng</th>
+                <th scope="col">Tên người dùng</th>
+                <th scope="col">Trạng thái</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for request in requests %}
+            <tr>
+                <td>{{ request.index }}</td>
+                <td><a href="{% url 'accept_request' request.request_id %}">{{ request.ename }}</a></td>
+                <td>{{ request.username }}</td>
+                <td>{{ request.status|format_status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

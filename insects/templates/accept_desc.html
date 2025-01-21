@@ -1,0 +1,111 @@
+{% extends "template_v2.html" %}
+{% block content %}
+<div style="background-color: #F5F5F5;" >
+    <div style="background-color: #F5F5F5;" class="container">
+             <br>
+        <div class="d-flex justify-content-center">
+
+            <h1 class="text display-6">Chấp nhận đóng góp mô tả ảnh coon trùng</h1>
+        </div>
+        <div>
+            <hr>
+        </div>
+        <div class="row">
+            <div class="col-md-3">
+                <table class="table">
+                    <tr>
+                        <td class="text-center"><p>Tên khoa học: {{ specie.ename }}</p></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center"><p>Phân loại khoa học</p></td>
+                    </tr>
+
+                    <tr>
+                        <td class="text-justify">
+                            <p>Giới (Kingdom): {{ specie.genus.family.order.class_field.phylum.kingdom.ename }}</p>
+                            <p>Ngành (Phylum): {{ specie.genus.family.order.class_field.phylum.ename }}</p>
+                            <p>Lớp (Class): {{ specie.genus.family.order.class_field.ename }}</p>
+                            <p>Bộ (Order): {{ specie.genus.family.order.ename }}</p>
+                            <p>Họ (Family): {{ specie.genus.family.ename }}</p>
+                            <p>Chi (Genus): {{ specie.genus.ename }}</p>
+                            <p>Loài (Species): {{ specie.ename }}</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-md-9">
+                <div class="d-flex justify-content-center">
+                    <img class="img-thumbnail mx-auto d-block" src="{{ MEDIA_URL }}{{img_info.url}}" style="width:600px" alt="">
+                </div>
+
+               <form action="{% url 'accept_desc_request' request_item.request_desc_id %}" method="post" class="row justify-content-center col-md-9" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                             <p class="fw-bold fs-3">Mô tả</p>
+                             <p>{{request_item.desc|linebreaksbr}}</p>
+
+                        </div>
+                        <!-- Centering the Crawl button -->
+                       {% if messages or request_item.status == 'accepted' or request_item.status == 'rejected' %}
+                        <div class="d-flex justify-content-center">
+                            <a class="btn btn-primary" href="{%url 'admin_desc_verify'%}" role="button">Quay về</a>
+                        </div>
+
+                        {%else%}
+                        <div class="d-flex justify-content-center">
+                            <button type="submit" name="action" value="reject" class="btn btn-primary m-2">Từ chối</button>
+                            <button type="submit" name="action" value="accept" class="btn btn-primary m-2">Chấp nhận</button>
+                        </div>
+                   {%endif%}
+                </form>
+
+            </div>
+ {% if messages %}
+ {% for message in messages %}
+     <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true" style="display: block;" aria-modal="true" role="dialog">
+         <div class="modal-dialog">
+             <div class="modal-content">
+                 <div class="modal-header">
+                     <h5 class="modal-title" id="successModalLabel">Success</h5>
+                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                 </div>
+                 <div class="modal-body">
+                     {{ message }}
+                 </div>
+                 <div class="modal-footer">
+                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                 </div>
+             </div>
+         </div>
+     </div>
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+     <script>
+         //var successModal = new bootstrap.Modal(document.getElementById('successModal'));
+         var myModalElement = document.getElementById('successModal');
+         var myModal = new bootstrap.Modal(myModalElement, {
+        keyboard: true // Optional: Allows closing the modal with the keyboard (ESC)
+    });
+         myModal.show();
+     </script>
+ {% endfor %}
+{% endif %}
+        </div>
+    </div>
+</div>
+
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function getCsrfToken() {
+        let csrfToken = null;
+        document.cookie.split(';').forEach(el => {
+            let [k, v] = el.split('=');
+            if (k.trim() === 'csrftoken') csrfToken = v;
+        });
+        return csrfToken;
+    }
+});
+</script>
+{% endblock %}

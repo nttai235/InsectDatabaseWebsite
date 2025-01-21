@@ -1,0 +1,62 @@
+{% extends "template_v2.html" %}
+{% block content %}
+<style>
+    .d-table-cell.align-middle {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh; /* Set the height to 100% of the viewport height */
+    }
+</style>
+
+<div class="d-flex justify-content-center align-items-center" style="height: 100vh; background-color: #121212;">
+    <div class="container d-flex justify-content-center align-items-center">
+        <div class="col-10" style="background-color: #202020; padding: 5rem;">
+            <div class="row justify-content-center">
+                <form action="" method="post" class="col-12 col-md-7"> 
+                    {% csrf_token %}
+                    <legend class="text-center text-white fw-bold">Đăng ký</legend>
+                    <div class="form-floating mb-3">
+                        <input type="text" class="form-control" id="username" name="username" placeholder="">
+                        <label for="username">Tên đăng nhập</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Password">
+                        <label for="password">Mật khẩu</label>
+                    </div>  
+                    <div class="form-floating mb-3">
+                        <input type="password" class="form-control" id="repassword" name="repassword" placeholder="Password">
+                        <label for="repassword">Xác nhận mật khẩu</label>
+                    </div>  
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary pt-3 pb-3">Đăng ký</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if message %}
+<div class="modal fade" id="messageModal" tabindex="-1" aria-labelledby="messageModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="messageModalLabel">{{ message_type|title }} Message</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {{ message }}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    var messageModal = new bootstrap.Modal(document.getElementById('messageModal'));
+    messageModal.show();
+</script>
+{% endif %}
+{% endblock %}

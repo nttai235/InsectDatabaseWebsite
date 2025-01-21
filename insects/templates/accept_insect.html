@@ -1,0 +1,79 @@
+{% extends "template_v2.html" %}
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center">
+    <form action="{% url 'accept_request' request_item.request_id %}" method="post" class="row justify-content-center col-12 col-md-7" enctype="multipart/form-data">
+        {% csrf_token %}
+        <legend class="text-center text-black fw-bold mt-3"><h1>Chấp nhận đề xuất côn trùng</h1></legend>
+
+        <div class="mb-3">
+            <label for="insectEname" class="form-label">Tên khoa học</label>
+            <input class="form-control" type="text" id="insectEname" name="insectEname" value="{{ request_item.ename }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="insectName" class="form-label">Tên thường gọi</label>
+            <input class="form-control" type="text" id="insectName" name="insectName" value="{{ request_item.name }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="speciesName" class="form-label">Tên loài</label>
+            <input class="form-control" type="text" id="speciesName" name="speciesName" value="{{ request_item.species_name }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="behavior" class="form-label">Tập tính</label>
+            <input class="form-control" type="text" id="behavior" name="behavior" value="{{ request_item.behavior }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="morphologicFeature" class="form-label">Hình thái</label>
+            <textarea class="form-control" id="morphologicFeature" name="morphologicFeature" required>{{ request_item.morphologic_feature }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label for="distribution" class="form-label">Phân bố</label>
+            <textarea class="form-control" id="distribution" name="distribution" required>{{ request_item.distribution }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label for="characteristic" class="form-label">Đặc điểm sinh học</label>
+            <textarea class="form-control" id="characteristic" name="characteristic" required>{{ request_item.characteristic }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label for="protectionMethod" class="form-label">Biện pháp phòng ngừa</label>
+            <textarea class="form-control" id="protectionMethod" name="protectionMethod" required>{{ request_item.protection_method }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label for="thumbnail" class="form-label">Hình ảnh</label>
+            <input type="file" class="form-control" id="thumbnail" name="thumbnail">
+            <small>Current: {{ request_item.thumbnail }}</small>
+        </div>
+
+        <div class="d-grid">
+            <button type="submit" class="btn btn-primary pt-3 pb-3">Chấp nhận</button>
+        </div>
+    </form>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% if messages %}
+        <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="successModalLabel">Success</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        {% for message in messages %}
+                            {{ message }}
+                        {% endfor %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            var successModal = new bootstrap.Modal(document.getElementById('successModal'), {
+                keyboard: true
+            });
+            successModal.show();
+        </script>
+    {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "template_v2.html" %}
+{% block content %}
+{% load custom_filters %}
+<div style="background-color: #F5F5F5;" >
+    <div style="background-color: #F5F5F5;" class="container">
+             <br>
+         <legend class="text-center text-black fw-bold mt-3">   <p class="fw-bold fs-2">Mô tả ảnh côn trùng</p></legend>
+        <div>
+            <hr>
+        </div>
+        <div class="row">
+            <div class="col-md-3">
+                <table class="table">
+                    <tr>
+                        <td class="text-center"><p>Tên khoa học: {{ specie.ename }}</p></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center"><p>Phân loại khoa học</p></td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <img class="img-thumbnail mx-auto d-block" src="{{ MEDIA_URL }}{{img_info.url}}" alt="">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-justify">
+                            <p>Giới (Kingdom): {{ specie.genus.family.order.class_field.phylum.kingdom.ename }}</p>
+                            <p>Ngành (Phylum): {{ specie.genus.family.order.class_field.phylum.ename }}</p>
+                            <p>Lớp (Class): {{ specie.genus.family.order.class_field.ename }}</p>
+                            <p>Bộ (Order): {{ specie.genus.family.order.ename }}</p>
+                            <p>Họ (Family): {{ specie.genus.family.ename }}</p>
+                            <p>Chi (Genus): {{ specie.genus.ename }}</p>
+                            <p>Loài (Species): {{ specie.ename }}</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-md-9">
+                <p class="fw-bold fs-3">Mô tả ảnh</p>
+                <hr>
+                <p>{{img_info.desc|linebreaksbr}}</p>
+                <hr>
+                <form action="{% url 'append_desc_handler' img_info.img_id %}" method="post" class="row justify-content-center col-12 col-md-7" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="insectSelect" class="form-label">Mô tả ảnh mới</label>
+                             <textarea class="form-control" id="new_desc" name="new_desc" value="new_desc" required></textarea>
+
+                        </div>
+                        <!-- Centering the Crawl button -->
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary pt-3 pb-3">Thêm mô tả mới</button>
+                        </div>
+                </form>
+                 <p class="fw-bold fs-3">Your History Description</p>
+                {%for request in request_desc %}
+                 <hr>
+                    <p>Your Description: {{request.desc|linebreaksbr}}</p>
+                    <p>Submitted At: {{ request.created_at|date:"Y-m-d H:i:s" }}</p>
+                    <p>Status: {{request.status|format_status}}</p>
+                <hr>
+                {%endfor%}
+            </div>
+ {% if messages %}
+ {% for message in messages %}
+     <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true" style="display: block;" aria-modal="true" role="dialog">
+         <div class="modal-dialog">
+             <div class="modal-content">
+                 <div class="modal-header">
+                     <h5 class="modal-title" id="successModalLabel">Success</h5>
+                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                 </div>
+                 <div class="modal-body">
+                     {{ message }}
+                 </div>
+                 <div class="modal-footer">
+                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                 </div>
+             </div>
+         </div>
+     </div>
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+     <script>
+         //var successModal = new bootstrap.Modal(document.getElementById('successModal'));
+         var myModalElement = document.getElementById('successModal');
+         var myModal = new bootstrap.Modal(myModalElement, {
+        keyboard: true // Optional: Allows closing the modal with the keyboard (ESC)
+    });
+         myModal.show();
+     </script>
+ {% endfor %}
+{% endif %}
+        </div>
+    </div>
+</div>
+
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function getCsrfToken() {
+        let csrfToken = null;
+        document.cookie.split(';').forEach(el => {
+            let [k, v] = el.split('=');
+            if (k.trim() === 'csrftoken') csrfToken = v;
+        });
+        return csrfToken;
+    }
+});
+</script>
+{% endblock %}

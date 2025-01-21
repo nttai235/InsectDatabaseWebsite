@@ -1,0 +1,338 @@
+{% extends "template.html" %}
+{% block content %}
+
+<!-- Modal HTML Markup -->
+<div id="imageModal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="imageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="modalContainer" style="position: relative;">
+                    <img id="modalImage" src="#" class="img-fluid">
+                    <svg id="modalSvg" style="position: absolute; top: 0; left: 0;" width="100%" height="100%">
+                        
+                    </svg>
+                </div>
+            </div>
+            <div class="container d-flex align-items-center justify-content-center mb-2">
+                <div class="container d-flex align-items-center justify-content-center mb-2">
+                    <button id="detailsButton" class="btn btn-success" data-slug="">Detail</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="background-color: #F5F5F5;">
+    <div class="row mt-3 ">
+        {% for image in images %}
+            <div class="d-flex flex-wrap col-sm-6 col-md-4 col-lg-3 mb-3">
+                <!-- <div class="card"> -->
+                    <svg class="img-fluid" viewBox="0 0 {{ image.width }} {{ image.height }}" data-insect-id="{{ image.insects.insects_id }}" data-insect-slug="{{ image.insects.slug }}">
+                        <image href="{{ MEDIA_URL }}{{ image.url }}" data-src="{{ MEDIA_URL }}{{ image.url }}" height="100%" width="100%" />
+                        {% for bbox in image.bboxes.all %}
+                        {% with text_x=bbox.x|add:2 text_y=bbox.y|add:15 %}
+                            <rect x="{{ bbox.x }}" y="{{ bbox.y }}" width="{{ bbox.width }}" height="{{ bbox.height }}" style="stroke:red;stroke-width:2;fill-opacity:0" />
+                            <text x="{{ text_x }}" y="{{ text_y }}" fill="red" class="bbox-text" font-size="18">{{ image.insects.name }}</text>
+                        {% endwith %}
+                        {% endfor %}
+                    </svg>
+                <!-- </div> -->
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+
+<!--Scripts-->
+<script>
+    var mediaUrl = document.body.getAttribute('data-media-url');
+    var lazyImageObserver;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var lazyImages = [].slice.call(document.querySelectorAll('image[data-src]'));
+        var loadMoreButton = document.getElementById('load-more');
+
+        if ('IntersectionObserver' in window) {
+            lazyImageObserver = new IntersectionObserver(function(entries, observer) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        let lazyImage = entry.target;
+                        lazyImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', lazyImage.dataset.src);
+                        lazyImage.removeAttribute('data-src');
+                        lazyImageObserver.unobserve(lazyImage);
+                    }
+                });
+            });
+
+            lazyImages.forEach(function(lazyImage) {
+                lazyImageObserver.observe(lazyImage);
+            });
+        } else {
+            // Fallback for browsers that don't support IntersectionObserver
+            lazyImages.forEach(function(lazyImage) {
+                lazyImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', lazyImage.dataset.src);
+                lazyImage.removeAttribute('data-src');
+            });
+        }
+        
+        var page_number = 2; // Start from the second page
+
+        $(window).scroll(function() {
+            if ($(window).scrollTop() + $(window).height() > $(document).height() - 100) {
+                $.get('/load_more_images/?page=' + page_number, function(data) {
+                    data.forEach(function(imageData) {
+                        var imageHTML = '<div class="col-sm-6 col-md-4 col-lg-3 mb-3"><div class="card"><svg class="img-fluid" viewBox="0 0 ' + imageData.width + ' ' + imageData.height + '"><image href="' + mediaUrl + imageData.url + '" data-src="' + mediaUrl + imageData.url + '"data-insect-slug="' + imageData.insects.slug + '" height="100%" width="100%" />';
+                        imageData.bboxes.forEach(function(bbox) {
+                            var adjustedX = bbox.x + 2.0;
+                            var adjustedY = bbox.y + 15.0;
+                            imageHTML += '<rect x="' + bbox.x + '" y="' + bbox.y + '" width="' + bbox.width + '" height="' + bbox.height + '" style="stroke:red;stroke-width:2;fill-opacity:0" />';
+                            imageHTML += '<text x="' + adjustedX + '" y="' + adjustedY + '" class="bbox-text" fill="red">' + imageData.insects.ename + '</text>';
+                        });
+                        imageHTML += '</svg></div></div>';
+                        $('.row').append(imageHTML);
+                    });
+                    page_number++;
+
+                    // Get the new images
+                    var newImages = [].slice.call(document.querySelectorAll('image[data-src]'));
+
+                    // Set up the IntersectionObserver for the new images
+                    newImages.forEach(function(newImage) {
+                        lazyImageObserver.observe(newImage);
+                    });
+
+                    if (!$('#chk_insect_name').is(':checked')) {
+                        $('.bbox-text').hide();
+                    }
+                });
+            }
+        });
+    });
+
+    $(document).on('click', 'svg', function() {
+        var imageUrl = $(this).find('image').attr('href');
+        var bboxesData = [];
+        $(this).find('rect').each(function() {
+            var bbox = {};
+            bbox.x = $(this).attr('x');
+            bbox.y = $(this).attr('y');
+            bbox.width = $(this).attr('width');
+            bbox.height = $(this).attr('height');
+            bbox.text = $(this).next('text').text(); // Get the text associated with the bounding box
+            bboxesData.push(bbox);
+        });
+        var insectName = $(this).find('.bbox-text').text(); // Get the insect name from the SVG
+        var viewBox = $(this).attr('viewBox'); // Get the viewBox from the SVG
+        var insectId = $(this).data('insect-id'); // Get the insect ID from the SVG's data attributes
+        var insectSlug = $(this).data('insect-slug'); // Retrieve the slug from the data attribute
+        openModal(imageUrl, bboxesData, insectName, insectId, viewBox, insectSlug);
+    });
+
+    function openModal(imageUrl, bboxesData, insectName, insectId, viewBox, insectSlug) {
+        var id = insectId;
+        var slug = insectSlug
+        $('#imageModalLabel').text(insectName);
+        $('#modalImage').attr('src', imageUrl);
+        $('#modalSvg').attr('viewBox', viewBox);
+        $('#modalSvg').empty();
+
+        $('#detailsButton').attr('data-slug', insectSlug);
+        $('#imageModal').modal('show');
+        // Add bounding boxes and text to the SVG
+        bboxesData.forEach(function(bbox) {
+            var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("x", bbox.x);
+            rect.setAttribute("y", bbox.y);
+            rect.setAttribute("width", bbox.width);
+            rect.setAttribute("height", bbox.height);
+            rect.setAttribute("style", "stroke:red;stroke-width:2;fill-opacity:0");
+            $('#modalSvg').append(rect);
+
+            var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.setAttribute("x", bbox.x);
+            text.setAttribute("y", bbox.y);
+            text.setAttribute("fill", "red");
+            text.setAttribute("font-size", "18");
+            text.textContent = bbox.text; // Display the text associated with the bounding box
+            $('#modalSvg').append(text);
+        });
+
+        $('#imageModal').modal('show');
+    }
+        $('#detailsButton').on('click', function() {
+        var slug = $(this).data('slug'); 
+        if (slug) {
+            window.location.href = '/detail/' + slug + '/';
+        } else {
+            console.error('Slug is missing');
+        }
+    });
+
+
+
+    $(document).ready(function() {
+        $('#chk_insect_name').change(function() {
+            if (this.checked) {
+                $('.bbox-text').show();
+            } else {
+                $('.bbox-text').hide();
+            }
+        });
+    });
+</script>
+
+<!-- <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const mediaUrl = document.body.getAttribute('data-media-url');
+    
+        initializeLazyLoading();
+        initializeInfiniteScroll();
+        initializeCheckboxToggle();
+    });
+    
+    function initializeLazyLoading() {
+        const lazyImages = document.querySelectorAll('image[data-src]');
+        if ('IntersectionObserver' in window) {
+            const lazyImageObserver = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const lazyImage = entry.target;
+                        lazyImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', lazyImage.dataset.src);
+                        lazyImage.removeAttribute('data-src');
+                        lazyImageObserver.unobserve(lazyImage);
+                    }
+                });
+            });
+    
+            lazyImages.forEach(lazyImage => {
+                lazyImageObserver.observe(lazyImage);
+            });
+        } else {
+            lazyImages.forEach(lazyImage => {
+                lazyImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', lazyImage.dataset.src);
+                lazyImage.removeAttribute('data-src');
+            });
+        }
+    }
+    
+    function initializeInfiniteScroll() {
+        let page_number = 2; // Start from the second page
+        window.addEventListener('scroll', function() {
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100 && !window.isFetchingImages) {
+                window.isFetchingImages = true;
+                fetch(`/load_more_images/?page=${page_number}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        data.forEach(imageData => {
+                            const imageHTML = createImageHtml(imageData);
+                            document.querySelector('.row').innerHTML += imageHTML;
+                        });
+                        page_number++;
+                        window.isFetchingImages = false; // Allow new fetches
+                        attachClickEventToNewSvgs(); // Ensure new SVGs have click handlers
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        window.isFetchingImages = false;
+                    });
+            }
+        });
+    }
+    
+    function attachClickEventToNewSvgs() {
+        document.querySelectorAll('svg:not(.event-bound)').forEach(svg => {
+            svg.classList.add('event-bound'); // Mark SVG as bound to avoid duplicate bindings
+            svg.addEventListener('click', function() {
+                const imageUrl = this.querySelector('image').getAttribute('href');
+                const insectId = this.dataset.insectId;
+                const bboxesData = Array.from(this.querySelectorAll('rect')).map(rect => ({
+                    x: rect.getAttribute('x'),
+                    y: rect.getAttribute('y'),
+                    width: rect.getAttribute('width'),
+                    height: rect.getAttribute('height'),
+                    text: rect.nextElementSibling ? rect.nextElementSibling.textContent : '' // Safeguarding
+                }));
+                const insectName = this.querySelector('.bbox-text') ? this.querySelector('.bbox-text').textContent : 'Unknown';
+                const viewBox = this.getAttribute('viewBox');
+                openModal(imageUrl, bboxesData, insectName, insectId, viewBox);
+            });
+        });
+    }
+    
+    function openModal(imageUrl, bboxesData, insectName, insectId, viewBox) {
+        var id = insectId;
+        $('#imageModalLabel').text(insectName + ' (ID: ' + id + ')');
+
+        // Set the original-size image in the modal
+        $('#modalImage').attr('src', imageUrl);
+
+        // Set the viewBox for the modal's SVG
+        $('#modalSvg').attr('viewBox', viewBox);
+
+        // Clear previous content from SVG
+        $('#modalSvg').empty();
+
+        // Add bounding boxes and text to the SVG
+        bboxesData.forEach(function(bbox) {
+            var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("x", bbox.x);
+            rect.setAttribute("y", bbox.y);
+            rect.setAttribute("width", bbox.width);
+            rect.setAttribute("height", bbox.height);
+            rect.setAttribute("style", "stroke:red;stroke-width:2;fill-opacity:0");
+            $('#modalSvg').append(rect);
+
+            var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.setAttribute("x", bbox.x + 2);
+            text.setAttribute("y", bbox.y + 15);
+            text.setAttribute("fill", "red");
+            text.setAttribute("font-size", "18");
+            text.textContent = bbox.text; // Display the text associated with the bounding box
+            $('#modalSvg').append(text);
+        });
+
+        $('#imageModal').modal('show');
+    }
+    
+    function initializeCheckboxToggle() {
+        document.getElementById('chk_insect_name').addEventListener('change', function() {
+            document.querySelectorAll('.bbox-text').forEach(text => {
+                text.style.display = this.checked ? 'block' : 'none';
+            });
+        });
+    }
+    
+    function createImageHtml(imageData) {
+        let svgContent = `<image href="${mediaUrl}${imageData.url}" height="100%" width="100%"/>`;
+        imageData.bboxes.forEach(bbox => {
+            svgContent += `
+                <rect x="${bbox.x}" y="${bbox.y}" width="${bbox.width}" height="${bbox.height}" style="stroke:red;stroke-width:2;fill-opacity:0"></rect>
+                <text x="${parseFloat(bbox.x) + 2}" y="${parseFloat(bbox.y) + 15}" fill="red" font-size="18">${bbox.ename}</text>
+            `;
+        });
+
+        // Construct the complete HTML for the image card
+        const imageHTML = `
+            <div class="col-sm-6 col-md-4 col-lg-3 mb-3">
+                <div class="card">
+                    <svg class="img-fluid" viewBox="0 0 ${imageData.width} ${imageData.height}" data-insect-id="${imageData.insects_id}">
+                        ${svgContent}
+                    </svg>
+                </div>
+            </div>
+        `;
+
+        return imageHTML;
+    }
+    
+    function setAttributes(el, attrs) {
+        for(const key in attrs) {
+            el.setAttribute(key, attrs[key]);
+        }
+    }
+</script> -->
+{% endblock %}

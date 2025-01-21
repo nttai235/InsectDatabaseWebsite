@@ -1,0 +1,35 @@
+{% extends "template_v2.html" %}
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center">
+    <form action="{% url 'search_by_image' %}" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <legend class="text-center text-black fw-bold mt-3">
+               <p class="fw-bold fs-2">Tìm kiếm bằng hình ảnh</p>
+        </legend>
+        <div class="mb-3">
+            <label for="insectImage" class="form-label">Chọn hình ảnh</label>
+            <input class="form-control" type="file" id="insectImage" name="insectImage" accept="image/*">
+        </div>
+        <div class="d-grid">
+            <button type="submit" class="btn btn-primary pt-3 pb-3">Tìm kiếm</button>
+        </div>
+    </form>
+</div>
+{% if species %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-center align-items-center">
+           <p class="fw-bold fs-2">Kết quả: {{ species.vi_name }} - {{ species.ename }}</p>
+    </div>
+    <div class="text-center">
+        <img src="/media/{{ result_img }}" class="img-fluid resized-image" alt="Thumbnail of {{ species.ename }}">
+        <p><h3><a href="{% url 'detail' slug=species.slug %}"><strong>{{ species.name }}</strong></a></h3></p>
+    </div>
+</div>
+{% elif error %}
+<div class="container mt-4">
+    <div class="alert alert-danger">
+        {{ error }}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

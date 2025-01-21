@@ -1,0 +1,67 @@
+{% extends "template_v2.html" %}
+{% block content %}
+
+<!-- Modal HTML Markup -->
+<div id="imageModal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="imageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="modalContainer" style="position: relative;">
+                    <img id="modalImage" src="#" class="img-fluid">
+                    <svg id="modalSvg" style="position: absolute; top: 0; left: 0;" width="100%" height="100%">
+                        
+                    </svg>
+                </div>
+            </div>
+            <div class="container d-flex align-items-center justify-content-center mb-2">
+                <div class="container d-flex align-items-center justify-content-center mb-2">
+                    <button id="detailsButton" class="btn btn-success" data-slug="">Chi tiết</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="background-color: #F5F5F5;">
+    <div class="row mt-3 ">
+        {% for spc in species_lst %}
+            <div class="align-items-center col-sm-6 col-md-4 col-lg-3 mb-3 image-card" data-img-id="${spc.img_id}">
+            <div class="card">
+                    <svg class="img-fluid" viewBox="0 0 {{ spc.width }} {{ spc.height }}" data-insect-id="{{ spc.insects_id }}" data-insect-slug="{{ spc.slug }}">
+                            <a  href= '/load_specie_image/?page=1&specie_id={{insectId}}'><image href="${{ MEDIA_URL }} {{spc.thumbnail}}" height="100%" width="100%"/></a>
+<!--                        <image href="{{ MEDIA_URL }}{{ spc.thumbnail }}" data-src="{{ MEDIA_URL }}{{ spc.thumbnail }}" height="100%" width="100%" />-->
+                    </svg>
+                     <p  class="text-center fw-bold fs-9">{{spc.name}}</p>
+<!--                <div>-->
+<!--                    <p  class="fw-bold fs-9">{{spc.name}}</p>-->
+<!--                    </div>-->
+            </div>
+        </div>
+
+        {% endfor %}
+    </div>
+
+</div>
+
+
+<!--Scripts-->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).on('click', 'svg', function() {
+        //var imageUrl = $(this).find('image').attr('href');
+        //var insectName = $(this).find('.bbox-text').text(); // Get the insect name from the SVG
+        //var insectId = $(this).data('insect-id'); // Get the insect ID from the SVG's data attributes
+        //var insectSlug = $(this).data('insect-slug'); // Retrieve the slug from the data attribute
+        //console.log("click",insectId);
+        //window.location.href = '/load_specie_image/?page=' + 1 + '&specie_id=' +insectId;
+        //console.log("click",insectId);
+        //openModal(imageUrl, bboxesData, insectName, insectId, viewBox, insectSlug);
+    });
+
+</script>
+
+{% endblock %}

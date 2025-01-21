@@ -1,0 +1,66 @@
+{% extends "template_v2.html" %}
+{% block content %}
+<div style="background-color: #F5F5F5;" >
+  <div style="background-color: #F5F5F5;" class="container">
+    <div class="d-flex justify-content-center">
+      <p class="fw-bold fs-2">{{ species.vi_name }} - {{ species.name }}</p>
+    </div>
+    <div>
+      <hr>
+    </div>
+    <div class="row">
+      <div class="col-md-3">
+        <table class="table">
+          <tr>
+            <td class="text-center"><p>Tên khoa học: {{ species.ename }}</p></td>
+          </tr>
+          <tr>
+            <td class="text-center"><p>Scientific Classification</p></td>
+          </tr>
+          <tr>
+            <td>
+              <img class="img-thumbnail mx-auto d-block" src="{{ MEDIA_URL }}{{species.thumbnail}}" alt="">
+            </td>
+          </tr>
+          <tr>
+            <td class="text-justify">
+              <p>Giới (Kingdom): {{ species.genus.family.order.class_field.phylum.kingdom.ename }}</p>
+              <p>Ngành (Phylum): {{ species.genus.family.order.class_field.phylum.ename }}</p>
+              <p>Lớp (Class): {{ species.genus.family.order.class_field.ename }}</p>
+              <p>Bộ (Order): {{ species.genus.family.order.ename }}</p>
+              <p>Họ (Family): {{ species.genus.family.ename }}</p>
+              <p>Chi (Genus): {{ species.genus.ename }}</p>
+              <p>Loài (Species): {{ species.ename }}</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div class="col-md-9">
+        <p class="fw-bold fs-3">Mô hình 3D</p>
+        <hr>
+        <div class="sketchfab-embed-wrapper">
+          <iframe
+                  title="Cicada" frameborder="0"
+                  allowfullscreen
+                  width="800" height="600"
+                  mozallowfullscreen="true"
+                  webkitallowfullscreen="true"
+                  allow="autoplay; fullscreen; xr-spatial-tracking"
+                  xr-spatial-tracking
+                  execution-while-out-of-viewport
+                  execution-while-not-rendered
+                  web-share
+                  src="https://sketchfab.com/models/d5b0c8a2126745ee88da18232edaa8c0/embed?autospin=1&autostart=1&transparent=1">
+          </iframe>
+        </div>
+      </div>
+    <div>
+      <hr>
+    </div>
+
+
+
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends "template_v2.html" %}
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center">
+    <!-- Upload Form -->
+    <form id="uploadForm" action="{% url 'upload_folder_zip' %}" method="post" class="row justify-content-center col-12 col-md-7" enctype="multipart/form-data">
+        {% csrf_token %}
+        <legend class="text-center text-black fw-bold mt-3"><h1>Tải lên file Zip</h1></legend>
+        <div class="mb-3">
+            <label for="insectSelect" class="form-label">Chọn côn trùng</label>
+            <select class="form-select" id="insectSelect" name="insectSelect">
+                {% for species in species_list %}
+                <option value="{{ species.insects_id }}">{{ species.ename }} - {{ species.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="insectImage" class="form-label">Select a Zip File</label>
+            <input class="form-control" type="file" id="insectImage" name="insectImage" accept="image/*, application/zip" multiple >
+            <!-- <input class="form-control" type="file" id="insectUpload" name="insectUpload" accept="application/zip, application/x-rar-compressed, image/*" multiple> -->
+        </div>
+        <div class="d-grid">
+            <button type="submit" class="btn btn-primary pt-3 pb-3">Upload</button>
+        </div>
+    </form>
+</div>
+
+<!-- Bootstrap Modal for Upload Status -->
+<div class="modal" id="uploadStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Trạng thái Upload</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="modalBodyContent">Đang tải...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const uploadForm = document.getElementById("uploadForm");
+    uploadForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        const formData = new FormData(uploadForm);
+        const uploadModal = new bootstrap.Modal(document.getElementById("uploadStatusModal"));
+        const modalBodyContent = document.getElementById("modalBodyContent");
+
+        modalBodyContent.textContent = "Loading...";
+        uploadModal.show();
+
+        fetch(uploadForm.action, {
+            method: "POST",
+            body: formData,
+        })
+        .then(response => response.json())
+        .then(data => {
+            modalBodyContent.textContent = data.success ? "Upload thành công!" : "Upload Fail.";
+        })
+        .catch(() => {
+            modalBodyContent.textContent = "An error occurred. Please try again.";
+        })
+        .finally(() => setTimeout(() => uploadModal.hide(), 2000)); // Hide modal after delay
+    });
+});
+</script>
+{% endblock %}

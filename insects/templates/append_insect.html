@@ -1,0 +1,91 @@
+{% extends "template_v2.html" %}
+{% block content %}
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="successModalLabel">Tải lên thành công</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+             <p class="fw-bold fs-2">
+                 Đề nghị thêm thành công!
+             </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+<div class="container d-flex justify-content-center align-items-center">
+    <form action="{% url 'append_insect_handler'  %}" method="post" class="row justify-content-center col-12 col-md-7" enctype="multipart/form-data">
+        {% csrf_token %}
+        <legend class="text-center text-black fw-bold mt-3">Đề xuất côn trùng</legend>
+        <div class="mb-3">
+            <label for="insectEname" class="form-label">Tên khoa học</label>
+            <input class="form-control" type="text" id="insectEname" name="insectEname" required>
+        </div>
+        <div class="mb-3">
+            <label for="insectName" class="form-label">Tên thường gọi</label>
+            <input class="form-control" type="text" id="insectName" name="insectName" required>
+        </div>
+        <div class="mb-3">
+            <label for="behavior" class="form-label">Tập tính</label>
+            <input class="form-control" type="text" id="behavior" name="behavior" required>
+        </div>
+        <div class="mb-3">
+            <label for="insectGenus" class="form-label">Chi</label>
+            <select class="form-select" id="insectGenus" name="insectGenus">
+                {% for genus in genus_list %}
+                    <option value="{{ genus.genus_id }}">{{ genus.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="insectSpecies" class="form-label">Tên loài</label>
+            <input class="form-control" type="text" id="insectSpecies" name="insectSpecies" required>
+        </div>
+        
+        <div class="mb-3">
+            <label for="characteristic" class="form-label">Đặc điểm sinh học</label>
+            <textarea class="form-control" type="text" id="characteristic" name="characteristic" required></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="distribution" class="form-label">Phân bố</label>
+            <textarea class="form-control" type="text" id="distribution" name="distribution" required></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="feature" class="form-label">Hình thái</label>
+            <textarea class="form-control" type="text" id="feature" name="feature" required></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="method" class="form-label">Biện pháp phòng ngừa</label>
+            <textarea class="form-control" type="text" id="method" name="method" required></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="thumbnail" class="form-label">Hình ảnh</label>
+            <input class="form-control" type="file" id="thumbnail" name="thumbnail">
+        </div> 
+        <!-- Centering the Upload button -->
+        <div class="d-grid">
+            <button type="submit" class="btn btn-primary pt-3 pb-3" id="uploadButton" >Tải lên</button>
+        </div>
+    </form>
+</div>
+
+{% if success %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var successModal = new bootstrap.Modal(document.getElementById('successModal'), {
+        keyboard: false
+    });
+    successModal.show();
+});
+</script>
+{% endif %}
+
+{% endblock %}
