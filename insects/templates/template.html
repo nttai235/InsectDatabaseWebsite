@@ -127,11 +127,13 @@
                                     <li class="dropdown-item">
                                         <a href="/append_insect/" style="text-decoration: none; color: black;">Đề nghị thêm côn trùng</a>
                                     </li>
-                                {% elif user|has_group:"CVs" %}
+                                {% endif %}
+                                {% if user|has_group:"CVs" %}
                                     <li class="dropdown-item">
                                         <a href="/cv_verify/" style="text-decoration: none; color: black;">Xét duyệt côn trùng</a>
                                     </li>
-                                {% elif user|has_group:"Admins" %}
+                                {% endif %}
+                                {% if user|has_group:"Admins" %}
                                     <li class="dropdown-item">
                                         <a href="/admin_verify/" style="text-decoration: none; color: black;">Chấp nhận đề nghị xét duyệt côn trùng</a>
                                     </li>
@@ -143,7 +145,7 @@
                                 <i class="fas fa-upload"></i>
                             </li>
 
-                            {% if request.user.is_authenticated %}
+                            {% if user.is_authenticated %}
                             <li class="dropdown-item">
                                 <a href="/logout/" style="text-decoration: none; color: black;">
                                     Đăng xuất

@@ -1,9 +1,13 @@
 import time
 from datetime import datetime, timezone
+from urllib.request import urlopen
 
+from django.contrib.sites import requests
 from django.shortcuts import render, redirect
 from django.conf import settings
-from .models import InsectsImage, Species, InsectsBbox, Genus, Request, RequestDesc
+from pygbif import occurrences
+
+from .models import InsectsImage, Species, InsectsBbox, Genus, Request, RequestDesc, InsectsCrawler
 from django.core.paginator import Paginator
 from django.utils.text import slugify
 from django.core.files.base import ContentFile
@@ -816,6 +820,177 @@ def data_crawler(request):
 def cancel_crawling(request):
     delete_tmp_images()
     return JsonResponse({'success': True})
+
+# ===============================TEST==================
+def data_crawler(request):
+    """
+    Hàm xử lý cho việc cào dữ liệu hình ảnh từ giao diện người dùng.
+    """
+    if request.method == 'POST':
+        # Lấy dữ liệu từ form
+        insect_id = request.POST.get('insectSelect')
+        quantity = int(request.POST.get('quantity', 1))
+
+        # Lấy thông tin loài dựa trên ID
+        species = get_object_or_404(Species, insects_id=insect_id)
+        species_name = species.ename  # Tên khoa học
+
+        # Cào hình ảnh từ GBIF
+        images = get_images_from_gbif(species_name, quantity)
+
+        # Nếu không có hình ảnh, trả về thông báo lỗi
+        if not images:
+            return JsonResponse({
+                "success": False,
+                "error": f"Không tìm thấy hình ảnh nào cho loài '{species_name}'."
+            })
+
+        # Lưu hình ảnh vào cơ sở dữ liệu
+        save_images_to_database(images, insect_id)
+
+        # Lấy danh sách hình ảnh đã lưu từ cơ sở dữ liệu
+        saved_images = InsectsImage.objects.filter(insects_id=insect_id)
+
+        # Trả về danh sách hình ảnh đã lưu
+        return JsonResponse({
+            "success": True,
+            "images": [
+                {"url": image.url, "img_id": image.img_id}
+                for image in saved_images
+            ]
+        })
+
+    # Xử lý yêu cầu GET (hiển thị giao diện)
+    species_list = Species.objects.all()
+    return render(request, 'crawler.html', {'species_list': species_list})
+
+# Hàm cào dữ liệu từ GBIF và lấy hình ảnh
+def get_images_from_gbif(species_name, limit):
+    # Tìm kiếm dữ liệu quan sát của loài
+    data = occurrences.search(scientificName=species_name, limit=limit)
+    images = []
+
+    # Lấy danh sách hình ảnh từ kết quả
+    for record in data.get("results", []):
+        if "media" in record and record["media"]:
+            for media in record["media"]:
+                if media.get("type") == "StillImage":
+                    images.append({
+                        "url": media.get("identifier"),
+                        "img_id": record.get("key", "unknown"),
+                    })
+    return images
+
+# Xử lý form cào ảnh
+def crawl_images(request):
+    """
+       Hàm xử lý cho việc cào dữ liệu hình ảnh từ giao diện người dùng.
+    """
+    if request.method == 'POST':
+        # Lấy dữ liệu từ form
+        insect_id = request.POST.get('insectSelect')
+        quantity = int(request.POST.get('quantity', 1))
+
+        # Lấy thông tin loài dựa trên ID
+        species = get_object_or_404(Species, insects_id=insect_id)
+        species_name = species.ename  # Tên khoa học
+
+        # Cào hình ảnh từ GBIF
+        images = get_images_from_gbif(species_name, quantity)
+
+        # Nếu không có hình ảnh, trả về thông báo lỗi
+        if not images:
+            return JsonResponse({
+                "success": False,
+                "error": f"Không tìm thấy hình ảnh nào cho loài '{species_name}'."
+            })
+
+        # Kiểm tra và gắn thêm thông tin về ảnh đã tồn tại
+        for image in images:
+            img_id = image['img_id']
+            img_url = image['url']
+            existing_image = InsectsCrawler.objects.filter(img_id=img_id).first()
+            if existing_image:
+                image['exists'] = True
+                image['upload_status'] = existing_image.status
+            else:
+                image['exists'] = False
+                image['upload_status'] = 'Not uploaded yet'
+
+        # Trả về danh sách hình ảnh đã cào
+        return JsonResponse({
+            "success": True,
+            "images": images
+        })
+
+    # Xử lý yêu cầu GET (hiển thị giao diện)
+    species_list = Species.objects.all()
+    return render(request, 'crawler.html', {'species_list': species_list})
+
+def upload_image(request):
+    if request.method == 'POST':
+        img_id = request.POST.get('img_id')
+        species_id = request.POST.get('species_id')
+        user_id = request.POST.get('user_id')
+
+        # Lấy thông tin loài từ database
+        species = get_object_or_404(Species, insects_id=species_id)
+
+        # Lấy đối tượng người dùng hiện tại
+        user = request.user  # Đây là đối tượng User
+
+        # Lấy URL hình ảnh từ cơ sở dữ liệu hoặc trực tiếp từ request
+        img_url = request.POST.get('img_url')  # Bạn cần chắc chắn rằng URL có sẵn hoặc đã được gửi lên
+        if not img_url:
+            return JsonResponse({'success': False, 'error': 'URL hình ảnh không hợp lệ'})
+
+        # Kiểm tra xem hình ảnh đã có trong cơ sở dữ liệu chưa
+        existing_image = InsectsCrawler.objects.filter(img_id=img_id.strip()).first()
+        if existing_image:
+            return JsonResponse(
+                {'success': False, 'message': 'Hình ảnh đã có trong cơ sở dữ liệu và không cần upload lại.'})
+
+        # Tải hình ảnh từ URL
+        try:
+            response = urlopen(img_url)
+            image_content = ContentFile(response.read())
+            file_name = f"{img_id}.jpg"  #Tên hình ảnh tải về là id ảnh
+            image_path = os.path.join('media/crawler/', file_name)  # Lưu hình ảnh vào thư mục media/uploads/
+
+            # Lưu hình ảnh vào thư mục
+            with open(image_path, 'wb') as f:
+                f.write(image_content.read())
+
+            # Lưu thông tin vào cơ sở dữ liệu
+            insect_crawler = InsectsCrawler.objects.create(
+                insects_id=species,
+                user_id=user,
+                img_url=image_path,
+                img_id=img_id,
+                crawl_time=timezone.now(),
+                status='success'  # Hoặc trạng thái tương ứng
+            )
+
+            return JsonResponse({'success': True, 'message': 'Hình ảnh đã được upload thành công.'})
+
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+
+    return JsonResponse({'success': False, 'error': 'Yêu cầu không hợp lệ.'})
+
+def download_image(url):
+    """
+    Hàm tải hình ảnh từ URL.
+    """
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.content
+    except Exception as e:
+        print(f"Error downloading image: {e}")
+    return None
+
+# =====================================================
 
 
 # def data_crawler(request):

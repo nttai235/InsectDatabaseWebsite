@@ -5,6 +5,8 @@
 #   * Make sure each ForeignKey and OneToOneField has `on_delete` set to the desired behavior
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
+from django.utils import timezone
+
 from django.db import models
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -319,3 +321,20 @@ class Species(models.Model):
 
     def __str__(self):
         return self.ename
+
+# Cào ảnh
+class InsectsCrawler(models.Model):
+    crawler_id  = models.AutoField(primary_key=True)
+    insects_id = models.ForeignKey('Species', on_delete=models.CASCADE, null=True, db_column='insects_id')
+    user_id = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, db_column='user_id')  # Liên kết đến bảng User
+    img_url = models.URLField(null=True, db_column='img_url')  # URL của hình ảnh
+    img_id = models.CharField(max_length=50, null=True, db_column='img_id')
+    crawl_time = models.DateTimeField(default=timezone.now)  # Thời gian cào, sử dụng timezone.now
+    status = models.CharField(max_length=20, choices=[('success', 'Success'), ('failed', 'Failed'), ('processing', 'Processing')], default='processing')
+
+    class Meta:
+        db_table = 'insects_crawler'
+
+    def __str__(self):
+        return f"Image ID: {self.img_id} - {self.status}"
+

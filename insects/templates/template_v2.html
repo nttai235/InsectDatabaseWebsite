@@ -31,6 +31,9 @@
 
         <!-- Template Stylesheet -->
         <link href="{% static 'css/style.css' %}" rel="stylesheet">
+
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <link href="{% static 'css/style.css' %}" rel="stylesheet">
     </head>
 
     <body>
@@ -132,6 +135,15 @@
                             {% endif %}
                         </ul>
                     </li>
+
+                    {% if user.is_authenticated %}
+                        {% if user|has_group:"Users" %}
+                            <li class="nav-item">
+                                <a href="/crawl_images/" class="nav-link active">Cào ảnh</a>
+                            </li>
+                        {% endif %}
+                    {% endif %}
+
                     {% if user.is_authenticated %}
                         {% if user|has_group:"CVs" %}
                             <li class="nav-item">

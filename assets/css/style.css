@@ -733,3 +733,33 @@
     background: var(--bs-dark) !important;
 }
 /*** copyright end ***/
+
+/*Form cào ảnh*/
+#image-container {
+        margin-top: 20px;
+}
+
+.img-fluid {
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card {
+    background-color: #f9f9f9;
+}
+
+.card-title {
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.row {
+    align-items: center; /* Căn giữa hình ảnh và thông tin */
+}
+
+.col-md-4 img {
+    max-height: 200px; /* Giới hạn chiều cao hình ảnh */
+    object-fit: cover; /* Đảm bảo hình ảnh không bị méo */
+}

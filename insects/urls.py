@@ -56,6 +56,9 @@ urlpatterns = [
     # path('ajax/crawl_images/', views.ajax_crawl_images, name='crawl_images'),
     path('data_crawler/', views.data_crawler, name='data_crawler'),
     path('cancel_crawling/', views.cancel_crawling, name='cancel_crawling'),
+    # Test
+    path('crawl_images/', views.crawl_images, name='crawl_images'),
+    path('upload_image/', views.upload_image, name='upload_image'),
 
     # annotations
     path('Labelling/', views.labelling, name='Labelling'),

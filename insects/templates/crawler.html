@@ -8,7 +8,7 @@
         <div class="container d-flex justify-content-center align-items-center mt-3">
             <div class="col-10" style="background-color: #F5F5F5;">
                 <div class="row justify-content-center">
-                    <form id="crawler-form" class="col-12 col-md-7" method="post"> 
+                    <form id="crawler-form" class="col-12 col-md-7" method="post" action="{% url 'crawl_images' %}">
                         {% csrf_token %}
                         <div class="mb-3">
                             <label for="insectSelect" class="form-label">Chọn côn trùng</label>
@@ -23,10 +23,10 @@
                             </select>
                         </div>
                         <div class="form-floating mb-3">
-                            <input type="number" class="form-control" name="quantity" id="quantity" placeholder="Quantity">
+                            <input type="number" class="form-control" name="quantity" id="quantity" placeholder="Quantity" value="1" min="1">
                             <label for="quantity">Số lượng</label>
                         </div>
-                        
+
                         <!-- Centering the Crawl button -->
                         <div class="d-grid">
                             <button type="submit" class="btn btn-primary pt-3 pb-3">Cào</button>
@@ -39,35 +39,76 @@
             <h1>Hình ảnh</h1>
         </div>
         <hr>
-        <div class="row" id="image-container">
+        <div class="row" id="image-container" >
             <!-- Images will be displayed here -->
         </div>
+        <div id="error-message" class="text-danger mt-3" style="display: none;"></div>
         <hr>
-        <div class="d-flex justify-content-center">
-            <button id="upload" class="btn btn-success">Upload</button>
-            <button id="cancel" class="btn btn-danger">Cancel</button>
-        </div>
     </div>
 </div>
 
 <script>
 $(document).ready(function() {
-    // Handle form submission
+    // Handle form submission for crawling images
     $('#crawler-form').submit(function(event) {
         event.preventDefault();
         var form = $(this);
         var url = form.attr('action');
+
+        // Ẩn thông báo lỗi nếu có
+        $('#error-message').hide();
 
         $.ajax({
             type: 'POST',
             url: url,
             data: form.serialize(),
             success: function(response) {
+                $('#image-container').empty(); // Xóa hình ảnh cũ nếu có
                 if (response.success) {
-                    $('#image-container').empty();
-                    $.each(response.images, function(index, image) {
-                        $('#image-container').append('<img src="' + image.url + '" alt="' + image.img_id + '">');
+                    // Lấy số lượng hình ảnh người dùng yêu cầu
+                    var quantity = parseInt($('#quantity').val());
+
+                    // Giới hạn số lượng hình ảnh hiển thị
+                    var imagesToDisplay = response.images.slice(0, quantity); // Cắt danh sách hình ảnh theo số lượng yêu cầu
+
+                    $.each(imagesToDisplay, function(index, image) {
+                        var currentTime = new Date().toLocaleString();
+                        var imageStatus = image.exists ? `Hình ảnh đã tồn tại, trạng thái: ${image.upload_status}` : "Chưa được upload";
+
+                        var uploadButtonText = image.exists ? 'Đã tải lên' : 'Upload';
+                        var uploadButtonDisabled = image.exists ? 'disabled' : '';  // Vô hiệu hóa nút nếu ảnh đã có
+
+
+                        $('#image-container').append(`
+                            <div class="row mb-4">
+                                <!-- Hình ảnh bên trái -->
+                                <div class="col-md-4 text-center">
+                                    <img src="${image.url}" alt="Image ${index + 1}" class="img-fluid rounded shadow" style="max-width: 100%; height: auto;">
+                                </div>
+                                <!-- Thông tin bên phải -->
+                                <div class="col-md-8">
+                                    <div class="card shadow border-0">
+                                        <div class="card-body">
+                                            <h5 class="card-title">Thông tin hình ảnh</h5>
+                                            <p class="card-text">
+                                                <strong>ID:</strong> ${image.img_id}<br>
+                                                <strong>URL:</strong> <a href="${image.url}" target="_blank">${image.url}</a>
+                                                </br>
+                                                <strong>Thời gian cào:</strong> ${currentTime}<br>
+                                                <strong>Trạng thái:</strong> ${imageStatus}
+                                            </p>
+                                            <div class="d-flex justify-content-between">
+                                                <button class="btn btn-success btn-sm upload-btn" data-id="${image.img_id}" data-url="${image.url}" ${uploadButtonDisabled}>${uploadButtonText}</button>
+                                                <button class="btn btn-danger btn-sm delete-btn" data-id="${image.img_id}">Delete</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                       `);
                     });
+                } else {
+                    $('#error-message').text(response.error).show();
                 }
             },
             error: function(xhr, errmsg, err) {
@@ -76,19 +117,54 @@ $(document).ready(function() {
         });
     });
 
-    // Handle cancel button click
-    $('#cancel').click(function() {
+    // Upload hình ảnh
+    $(document).on('click', '.upload-btn', function() {
+        var img_id = $(this).data('id');
+        var species_id = $('#insectSelect').val(); // Lấy ID loài từ dropdown
+        var user_id = $('#user_id').val(); // Lấy ID người dùng (nếu có trong form)
+        var img_url = $(this).data('url'); // Lấy URL hình ảnh từ nút upload
+        var button = $(this);  // Lưu đối tượng nút upload
+
+        // Thay đổi văn bản nút và vô hiệu hóa nút upload
+        button.prop('disabled', true);
+        button.text('Đang xử lý...');
+
         $.ajax({
-            type: 'GET',
-            url: '{% url "cancel_crawling" %}',
+            type: 'POST',
+            url: '{% url "upload_image" %}',  // URL cần gọi để upload hình
+            data: {
+                'img_id': img_id,
+                'species_id': species_id,
+                'user_id': user_id,
+                'img_url': img_url, // Thêm URL vào dữ liệu gửi lên
+                'csrfmiddlewaretoken': $('input[name="csrfmiddlewaretoken"]').val()
+            },
             success: function(response) {
-                $('#image-container').empty();
+                if (response.success) {
+                    alert('Hình ảnh đã được upload thành công.');
+                    // Cập nhật trạng thái hoặc giao diện nếu cần
+                } else {
+                    alert(response.error);
+                }
             },
             error: function(xhr, errmsg, err) {
                 console.log(xhr.status + ": " + xhr.responseText);
+            },
+            complete: function() {
+                // Khôi phục lại trạng thái nút upload
+                button.prop('disabled', false);
+                button.text('Upload');
             }
         });
     });
+
+    $(document).on('click', '.delete-btn', function() {
+        // Xóa hình ảnh khỏi giao diện bằng cách xóa phần tử HTML chứa nó
+        $(this).closest('.row').remove();
+    });
 });
+
+
 </script>
+
 {% endblock %}
