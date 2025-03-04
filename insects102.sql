@@ -657,7 +657,7 @@ ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP;
 
 LOCK TABLES `request_desc` WRITE;
 /*!40000 ALTER TABLE `request_desc` DISABLE KEYS */;
-INSERT INTO `request_desc` VALUES (13,'IP000000003','verified',4,8,'8888'),(14,'IP000000008','accepted',14,8,'mô tả của tôi'),(15,'IP000000002','accepted',4,9,'yyyyy'),(16,'IP002000022','verified',4,9,'Insects have 2 big eyes, 6 legs and 2 black wings\r\n'),(17,'IP000000008','pending',0,9,'Has two large orange-brown wings');
+INSERT INTO `request_desc` (`request_desc_id`, `img_id`, `status`, `verification_count`, `user_id`, `desc`) VALUES (13,'IP000000003','verified',4,8,'8888'),(14,'IP000000008','accepted',14,8,'mô tả của tôi'),(15,'IP000000002','accepted',4,9,'yyyyy'),(16,'IP002000022','verified',4,9,'Insects have 2 big eyes, 6 legs and 2 black wings\r\n'),(17,'IP000000008','pending',0,9,'Has two large orange-brown wings');
 /*!40000 ALTER TABLE `request_desc` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -700,6 +700,27 @@ INSERT INTO `species` VALUES (1,'Cnaphalocrocis_medinalis','Rice leaf roller','C
 /*!40000 ALTER TABLE `species` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+DROP TABLE IF EXISTS `document`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `document` (
+  `doc_id` int NOT NULL AUTO_INCREMENT,
+  `doc_name` varchar(255) CHARACTER SET utf8mb3 COLLATE utf8mb3_unicode_ci NOT NULL,
+  `url` varchar(500) CHARACTER SET utf8mb3 COLLATE utf8mb3_unicode_ci NOT NULL,
+  PRIMARY KEY (`doc_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `kingdom`
+--
+
+LOCK TABLES `document` WRITE;
+/*!40000 ALTER TABLE `document` DISABLE KEYS */;
+INSERT INTO `document` VALUES (1,'Giáo trình Côn trùng nông nghiệp','documents/giaotrinhcontrungnongnghiep.pdf'),(2, 'Giáo trình Côn trùng học đại cương', 'documents/giaotrinhcontrunghocdaicuong.pdf'),(3,'Sử dụng côn trùng có ích trong nông nghiệp','documents/sudungcontrungcoichtrongnongnghiep.pdf');
+/*!40000 ALTER TABLE `document` ENABLE KEYS */;
+UNLOCK TABLES;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;

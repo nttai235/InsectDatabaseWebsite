@@ -30,6 +30,20 @@ urlpatterns = [
     path('image_search/', views.image_search, name='image_search'),
     path('search_by_image/', views.search_by_image, name='search_by_image'),
     path('export_data/', views.export_data, name='export_data'),
+    path('document/', views.document_list, name='document_list'),
+    path('view_document/<int:doc_id>/', views.view_document, name='view_document'),
+    path('download/<int:doc_id>/', views.download_document, name='download_document'),
+    # manage insect
+    path('manage_insect/', views.manage_insect, name='manage_insect'),
+    #manage_account
+    path('account_info/', views.account_info, name='account_info'),
+    path('edit_account/', views.edit_account, name='edit_account'),
+    path('change_password/', views.change_password, name='change_password'),
+    #manage user
+    path('manage_user/', views.manage_user, name='manage_user'),
+    path('manage_user/add/', views.add_user, name='add_user'),
+    path('manage_user/delete/<int:user_id>/', views.delete_user, name='delete_user'),
+    path('manage_user/edit/<int:user_id>/', views.edit_user, name='edit_user'),
     # import data
     path('import_data/', views.import_data, name='import_data'),
     path('upload_handler/', views.upload_handler, name='upload_handler'),
@@ -40,10 +54,16 @@ urlpatterns = [
     path('sign_up/', views.sign_up, name='sign_up'),
     # folder upload
     path('upload_folder_zip/', views.upload_folder_zip, name='upload_folder_zip'),
-    path("statistics/", views.statistics_view, name="shop-statistics"),  # new
-    path("chart/image_by_species/", views.get_species_chart, name="get_species_chart"),
-    path('species_list/', views.species_list, name='species_list'),
+    # statistics
+    path('statistics/', views.statistics_view, name='shop-statistics'),  # new
+    path('chart/image_by_species/', views.get_species_img_chart, name='get_species_chart'),
+    path('chart/user_by_group/', views.user_by_group_chart, name='user_by_group_chart'),
+    path('chart/order_by_class/', views.order_by_class_chart, name='order_by_class_chart'),
+    path('chart/family_by_order/', views.family_by_order_chart, name='family_by_order_chart'),
+    path('chart/genus_by_family/', views.genus_by_family_chart, name='genus_by_family_chart'),
+    path('chart/species_by_genus/', views.species_by_genus_chart, name='species_by_genus_chart'),
 
+    path('species_list/', views.species_list, name='species_list'),
     path('load_specie_image/', views.load_specie_image, name='load_specie_image'),
 
 
@@ -76,7 +96,7 @@ urlpatterns = [
 
     ## Description
     path('cv_desc_verify/', views.cv_desc_verify, name='cv_desc_verify'),
-    path("add_desc/", views.add_desc, name="add_desc"),  # new
+    path('add_desc/', views.add_desc, name='add_desc'),  # new
     path('add_desc_step2/', views.add_desc_step2, name='add_desc_step2'),
     path('add_desc_handler/<str:img_id>/', views.add_desc_handler, name='append_desc_handler'),
     path('admin_desc_verify/', views.admin_desc_verify, name='admin_desc_verify'),

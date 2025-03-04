@@ -1,0 +1,147 @@
+{% extends "template_v2.html" %}
+{% load custom_filters %} 
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Modal Thông báo -->
+    <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="successModalLabel">Thông báo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% for message in messages %}
+                        {{ message }}
+                    {% endfor %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2>Quản lý người dùng</h2>
+
+    <a href="{% url 'add_user' %}" class="btn btn-primary mb-3">
+        <i class="bi bi-plus-circle"></i> Thêm Người Dùng
+    </a>
+
+    <form method="GET" class="row mb-3 g-2 align-items-center">
+        <label class="fw-bold">Lọc và tìm kiếm:</label>
+        <div class="col-md-3">
+            <input type="text" name="search" class="form-control" placeholder="Nhập username, họ hoặc tên..."
+                   value="{{ search_query }}">
+        </div>
+        <div class="col-md-2">
+            <select name="group" class="form-select">
+                <option value="">Lọc theo phân quyền</option>
+                {% for group in groups %}
+                <option value="{{ group.name }}" {% if group.name == filter_group %}selected{% endif %}>{{ group.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <input type="date" name="last_login" class="form-control" value="{{ filter_last_login }}">
+        </div>
+        <div class="col-md-4">
+            <button type="submit" class="btn btn-primary">Tìm kiếm</button>
+            <a href="{% url 'manage_user' %}" class="btn btn-secondary">Làm mới</a>
+        </div>
+    </form>
+
+
+    <div class="mb-3">
+        <label class="fw-bold">Sắp xếp theo:</label>
+        <a href="?sort=username&order={% if sort_by == 'username' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="btn btn-outline-primary btn-sm">Username</a>
+        <a href="?sort=last_name&order={% if sort_by == 'last_name' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="btn btn-outline-primary btn-sm">Họ</a>
+        <a href="?sort=first_name&order={% if sort_by == 'first_name' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="btn btn-outline-primary btn-sm">Tên</a>
+        <a href="?sort=email&order={% if sort_by == 'email' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="btn btn-outline-primary btn-sm">Email</a>
+        <a href="?sort=group&order={% if sort_by == 'group' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="btn btn-outline-primary btn-sm">Phân quyền</a>
+        <a href="?sort=last_login&order={% if sort_by == 'last_login' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="btn btn-outline-primary btn-sm">Đăng nhập lần cuối</a>
+    </div>
+    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+        <table class="table table-bordered table-striped">
+        <thead class="table-dark" style="position: sticky; top: 0; z-index: 10;">
+            <tr>
+                <th scope="col">Username</th>
+                <th scope="col">Họ lót</th>
+                <th scope="col">Tên</th>
+                <th scope="col">Email</th>
+                <th scope="col">Phân quyền</th>
+                <th scope="col">Đăng nhập lần cuối</th>
+                <th></th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% if users %}
+            {% for user in users %}
+            <tr>
+                <td>{{ user.username }}</td>
+                <td>{{ user.last_name }}</td>
+                <td>{{ user.first_name }}</td>
+                <td>{{ user.email }}</td>
+                <td>
+                    {% for group in user.groups.all %}
+                        {{ group.name }}
+                    {% endfor %}
+                </td>
+                <td>{{ user.last_login|date:"d/m/Y H:i:s" }}</td>
+                <td>
+                    <a href="{% url 'edit_user' user.id %}">
+                        <i class="bi bi-pencil-square"></i>
+                    </a>
+                </td>
+                <td>
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#deleteModal{{ user.id }}">
+                        <i class="bi bi-trash-fill text-danger"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <td colspan="8" class="text-center text-muted">Không có người dùng nào.</td>
+        {% endif %}
+        </tbody>
+    </table>
+    </div>
+    {% for user in users %}
+    <!-- Modal Xóa -->
+    <div class="modal fade" id="deleteModal{{ user.id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ user.id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel{{ user.id }}">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Bạn có chắc chắn muốn xóa người dùng <strong>{{ user.username }}</strong> không?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <form method="POST" action="{% url 'delete_user' user.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">Xóa</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var hasMessage = {{ messages|length|yesno:"true,false" }};
+        if (hasMessage) {
+            var successModal = new bootstrap.Modal(document.getElementById('successModal'));
+            successModal.show();
+        }
+    });
+</script>
+
+{% endblock %}

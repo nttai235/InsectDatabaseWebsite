@@ -1,0 +1,50 @@
+{% extends "template_v2.html" %}
+{% load custom_filters %} 
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Tài liệu côn trùng</h2>
+    <form method="GET" class="row mb-3 g-2 align-items-center">
+        <label class="fw-bold">Tìm kiếm:</label>
+        <div class="col-md-3">
+            <input type="text" name="search" class="form-control" placeholder="Nhập tên tài liệu..."
+                   value="{{ search_query }}">
+        </div>
+        <div class="col-md-4">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Tìm kiếm</button>
+            <a href="{% url 'document_list' %}" class="btn btn-secondary">Làm mới</a>
+        </div>
+    </form>
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th scope="col">Tên tài liệu</th>
+                <th scope="col">Xem</th>
+                <th scope="col">Tải xuống</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% if documents %}
+            {% for document in documents %}
+            <tr>
+                <td>{{ document.doc_name }}</td>
+                <td>
+                    <a href="{% url 'view_document' document.doc_id %}">
+                        <i class="bi bi-eye"></i>
+                    </a>
+                </td>
+                <td><a href="{% url 'download_document' document.doc_id %}">
+                    <i class="bi bi-download"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+         {%else%}
+            <tr>
+                <td colspan="8" class="text-center text-muted">Không có tài liệu nào.</td>
+            </tr>
+        {%endif%}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

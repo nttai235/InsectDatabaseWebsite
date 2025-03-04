@@ -13,23 +13,43 @@
     <div class="container d-flex justify-content-center align-items-center">
         <div class="col-10" style="background-color: #202020; padding: 5rem;">
             <div class="row justify-content-center">
-                <form action="" method="post" class="col-12 col-md-7"> 
+                <form action="" method="post" class="col-12 col-md-7">
                     {% csrf_token %}
                     <legend class="text-center text-white fw-bold">Đăng ký</legend>
+                    <div class="d-flex gap-3 mb-3">
+                        <div class="form-floating flex-fill">
+                            <input type="text" class="form-control" id="lastname" name="lastname" placeholder="Nhập Họ">
+                            <label for="lastname">Họ lót</label>
+                        </div>
+                        <div class="form-floating flex-fill">
+                            <input type="text" class="form-control" id="firstname" name="firstname" placeholder="Nhập Tên">
+                            <label for="firstname">Tên</label>
+                        </div>
+                    </div>
                     <div class="form-floating mb-3">
-                        <input type="text" class="form-control" id="username" name="username" placeholder="">
+                        <input type="email" class="form-control" id="email" name="email" placeholder="Nhập email">
+                        <label for="email">Email</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input type="text" class="form-control" id="username" name="username" placeholder="Nhập tên đăng nhập">
                         <label for="username">Tên đăng nhập</label>
                     </div>
                     <div class="form-floating mb-3">
-                        <input type="password" class="form-control" id="password" name="password" placeholder="Password">
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Nhập mật khẩu">
                         <label for="password">Mật khẩu</label>
-                    </div>  
+                    </div>
                     <div class="form-floating mb-3">
-                        <input type="password" class="form-control" id="repassword" name="repassword" placeholder="Password">
+                        <input type="password" class="form-control" id="repassword" name="repassword" placeholder="Nhập lại mật khẩu">
                         <label for="repassword">Xác nhận mật khẩu</label>
-                    </div>  
+                    </div>
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary pt-3 pb-3">Đăng ký</button>
+                    </div>
+                    <div class="d-flex justify-content-between my-2">
+                        <div></div>
+                        <div class="text-end mb-3">
+                            Đã có tài khoản? <a href="/login/" class="text-white">Đăng nhập.</a>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -51,12 +71,22 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
             </div>
+
         </div>
     </div>
 </div>
+<!--<script>-->
+<!--    var messageModal = new bootstrap.Modal(document.getElementById('messageModal'));-->
+<!--    messageModal.show();-->
+<!--</script>-->
 <script>
-    var messageModal = new bootstrap.Modal(document.getElementById('messageModal'));
-    messageModal.show();
+    document.addEventListener("DOMContentLoaded", function () {
+        var modalElement = document.getElementById('messageModal');
+        if (modalElement) {
+            var errorModal = new bootstrap.Modal(modalElement, { keyboard: false });
+            errorModal.show();
+        }
+    });
 </script>
 {% endif %}
 {% endblock %}

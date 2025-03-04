@@ -259,3 +259,12 @@ class Species(models.Model):
     class Meta:
         managed = False
         db_table = 'species'
+
+class Document(models.Model):
+    doc_id = models.AutoField(primary_key=True)
+    doc_name = models.CharField(max_length=255)
+    url = models.CharField(max_length=500)
+
+    class Meta:
+        managed = False
+        db_table = 'document'

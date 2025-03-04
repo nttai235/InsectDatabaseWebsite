@@ -1,33 +1,28 @@
-import time
-from datetime import datetime, timezone
+import re
 
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect
 from django.conf import settings
-from .models import InsectsImage, Species, InsectsBbox, Genus, Request, RequestDesc
+from .models import InsectsImage, Species, InsectsBbox, Genus, RequestDesc, Document, Class, Family, Order, Phylum
+from insects.templatetags.forms import UserEditForm
 from django.core.paginator import Paginator
 from django.utils.text import slugify
 from django.core.files.base import ContentFile
-from django.http import Http404, JsonResponse, HttpResponse, FileResponse
+from django.http import Http404, HttpResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.hashers import make_password
-from django.core.files.storage import default_storage
 from PIL import Image
-from rarfile import RarFile
 import json
-import zipfile, io, os
-from django.contrib.auth import authenticate, login as django_login, logout
-from zipfile import ZipFile
-from .import_zip_folder import handle_uploaded_folder, handle_uploaded_zip
-from django.shortcuts import get_object_or_404
+import zipfile
+from django.contrib.auth import authenticate, login as django_login, logout, update_session_auth_hash
 from .serializers import SpeciesSerializer, ImageSerializer, ImageBoxSerializer, BoundingBoxSerializer
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser
 from django.shortcuts import render, get_object_or_404
 import os
 # from .excel_export import export_species_data_to_csv
@@ -35,11 +30,11 @@ from .excel_export_1 import export_species_data_to_csv
 from django.core.files.storage import default_storage
 from django.http import JsonResponse, HttpResponseBadRequest
 from .crawler import download_images, delete_tmp_images, save_images_to_database
-from django.db.models import Q
+from django.db.models import Q, OuterRef, Subquery
 import uuid
 
 # NQA
-from django.db.models import Count, F, Sum, Avg
+from django.db.models import Count
 
 
 # End NQA
@@ -385,20 +380,38 @@ def sign_up(request):
     message_type = None
 
     if request.method == 'POST':
+        lastname = request.POST.get('lastname')
+        firstname = request.POST.get('firstname')
+        email = request.POST.get('email')
         username = request.POST.get('username')
         password = request.POST.get('password')
+        repassword = request.POST.get('repassword')
 
-        if not username or not password:
-            message = "Tên đăng nhập và mật khẩu không được để trống!"
+        email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+
+        if not username or not password or not lastname or not firstname or not email or not repassword:
+            message = "Các trường không được để trống!"
             message_type = 'error'
         elif User.objects.filter(username=username).exists():
-            message = "Tên đăng nhập đã tồn tại!"
+            message = "Tên đăng nhập đã được đăng ký!"
+            message_type = 'error'
+        elif not re.match(email_regex, email):
+            message = "Email không hợp lệ!"
+            message_type = 'error'
+        elif User.objects.filter(email=email).exists():
+            message = "Email đã được một tài khoản khác đăng ký!"
+            message_type = 'error'
+        elif password != repassword:
+            message = "Mật khẩu xác nhận không khớp!"
             message_type = 'error'
         else:
             # Create new user
             user = User.objects.create(
                 username=username,
                 password=make_password(password),
+                first_name=firstname,
+                last_name=lastname,
+                email=email,
                 is_staff=False,
                 is_active=True
             )
@@ -441,7 +454,7 @@ def auth_user(request):
 def logout_view(request):
     logout(request)
     # Redirect to homepage or login page after logout
-    return redirect('/')
+    return redirect('login')
 
 
 # import_data.html section
@@ -1091,43 +1104,6 @@ def export_data(request):
 
     return response
 
-
-##NQA###
-
-def get_species_chart(request):
-    # InsectsImage = Species.objects.all() # all image
-    # species_dict = InsectsImage.objects.all() #all spieces
-    # total_image= InsectsImage.objects.count()
-    Images_by_species = InsectsImage.objects.values('insects__name').annotate(count=Count('img_id')).order_by('-count')
-    species_dict = dict()
-    for s in Images_by_species:
-        species_dict[s['insects__name']] = s['count']
-
-    colorPalette = ["#55efc4", "#81ecec", "#a29bfe", "#ffeaa7", "#fab1a0", "#ff7675", "#fd79a8"]
-    colorPrimary, colorSuccess, colorDanger = "#79aec8", colorPalette[0], colorPalette[5]
-    return JsonResponse({
-        "title": f"Number image of Species",
-        "data": {
-            "labels": list(species_dict.keys()),
-            "datasets": [{
-                "label": "Number",
-                "backgroundColor": colorPrimary,
-                "borderColor": colorPrimary,
-                "data": list(species_dict.values())
-
-            }]
-        },
-    })
-
-
-def statistics_view(request):
-    total_image = InsectsImage.objects.count()
-    return render(request, "statistics.html", {'total_image': total_image})
-
-
-##END NQA###
-
-
 def home_view(request):
     return render(request, "template_v2.html", {})
 
@@ -1375,3 +1351,462 @@ def load_specie_image(request):
                   {'page_obj': page_obj, 'specie_id': spc_id, 'specie_info': specie_info,
                    'MEDIA_URL': settings.MEDIA_URL})
 
+#document
+def document_list(request):
+    search_query = request.GET.get('search', '').strip()  # Lấy từ khóa tìm kiếm từ request
+    documents = Document.objects.all()
+
+    if search_query:
+        documents = documents.filter(doc_name__icontains=search_query)  # Lọc theo tên tài liệu
+
+    return render(request, 'document.html', {'documents': documents, 'search_query': search_query})
+
+
+def view_document(request, doc_id):
+    document = get_object_or_404(Document, doc_id=doc_id)
+    return render(request, 'view_document.html', {'document': document, 'MEDIA_URL': settings.MEDIA_URL})
+
+def download_document(request, doc_id):
+    document = get_object_or_404(Document, pk=doc_id)
+    file_path = os.path.join(settings.MEDIA_ROOT, str(document.url))
+
+    return FileResponse(open(file_path, 'rb'), as_attachment=True)
+
+#Manage user
+@login_required()
+def manage_user(request):
+    users = User.objects.exclude(id=request.user.id)
+    groups = Group.objects.all()
+
+    #Xử lý tìm kiếm
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        users = users.filter(
+            Q(username__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query)
+        )
+
+    #Xử lý sắp xếp
+    sort_by = request.GET.get('sort', 'username')  # Mặc định sắp xếp theo username
+    sort_order = request.GET.get('order', 'asc')
+
+    if sort_by == "group":
+        subquery = Group.objects.filter(user=OuterRef('id')).values('name')[:1]
+        users = users.annotate(group_name=Subquery(subquery))  # Lấy tên nhóm đầu tiên
+        sort_by = "group_name"
+
+    if sort_order == 'desc':
+        users = users.order_by(f'-{sort_by}')
+    else:
+        users = users.order_by(sort_by)
+
+    #Xử lý lọc
+    filter_group = request.GET.get('group', '')
+    if filter_group:
+        users = users.filter(groups__name=filter_group)
+
+    filter_last_login = request.GET.get('last_login', '')
+    if filter_last_login:
+        users = users.filter(last_login__date=filter_last_login)
+
+    return render(request, 'manage_user.html', {
+        'users': users,
+        'groups': groups,
+        'search_query': search_query,
+        'sort_by': sort_by,
+        'sort_order': sort_order,
+        'filter_group': filter_group,
+        'filter_last_login': filter_last_login
+    })
+
+@login_required()
+def add_user(request):
+    if request.method == "POST":
+        username = request.POST.get("username")
+        first_name = request.POST.get("first_name")
+        last_name = request.POST.get("last_name")
+        email = request.POST.get("email")
+        password = request.POST.get("password")
+        user_group = request.POST.get("user_group")
+
+        if User.objects.filter(username=username).exists():
+            messages.error(request, "Người dùng đã tồn tại!")
+        elif User.objects.filter(email=email).exists():
+            messages.error(request, "Email đã được người dùng khác đăng ký!")
+        else:
+            user = User.objects.create(
+                username=username,
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                password=make_password(password),
+                is_active=True
+            )
+
+            if user_group:
+                group = Group.objects.get(name=user_group)
+                user.groups.add(group)
+                if group.name == "Admins":
+                    user.is_staff = True
+                    user.save()
+
+            messages.success(request, "Thêm người dùng thành công!")
+        return redirect("add_user")
+
+        # Lấy danh sách group để hiển thị trong form
+    groups = Group.objects.all()
+    return render(request, "add_user.html", {"groups": groups})
+
+@login_required
+def edit_user(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+    success = False
+
+    if request.method == "POST":
+        form = UserEditForm(request.POST, instance=user)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.groups.clear()
+
+            if form.cleaned_data['groups']:
+                selected_group = form.cleaned_data['groups']
+                user.groups.set([selected_group])
+                if selected_group.name == "Admins":
+                    user.is_staff = True
+                else:
+                    user.is_staff = False
+            user.save()
+            success = True
+    else:
+        form = UserEditForm(instance=user)
+
+    return render(request, 'edit_user.html', {'form': form, 'user': user, 'success': success})
+
+@login_required()
+def delete_user(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+
+    if request.method == "POST":
+        user.delete()
+        messages.success(request, f"Đã xóa người dùng {user.username} thành công!")
+
+    return redirect('manage_user')
+
+#account_info
+@login_required()
+def account_info(request):
+    user = request.user
+    context = {
+        "username": user.username,
+        "last_name": user.last_name,
+        "first_name": user.first_name,
+        "email": user.email,
+        "last_login": user.last_login,
+        "groups": user.groups.all(),
+    }
+    # print(context)
+    return render(request, "account_info.html", context)
+
+
+@login_required
+def edit_account(request):
+    if request.method == "POST":
+        user = request.user
+        user.username = request.POST["username"]
+        user.last_name = request.POST["last_name"]
+        user.first_name = request.POST["first_name"]
+        user.email = request.POST["email"]
+        user.save()
+        success_message = "Cập nhật thông tin thành công!"
+        return render(request, "account_info.html", {
+            "success_message": success_message,
+            "username": user.username,
+            "last_name": user.last_name,
+            "first_name": user.first_name,
+            "email": user.email,
+            "last_login": user.last_login,
+            "groups": user.groups.all(),
+        })
+    return redirect("account_info")
+
+
+@login_required
+def change_password(request):
+    if request.method == "POST":
+        user = request.user
+        old_password = request.POST["old_password"]
+        new_password = request.POST["new_password"]
+        confirm_password = request.POST["confirm_password"]
+
+        if not user.check_password(old_password):
+            return render(request, "account_info.html", {
+                "success_message": "Mật khẩu cũ không chính xác!",
+                "username": user.username,
+                "last_name": user.last_name,
+                "first_name": user.first_name,
+                "email": user.email,
+                "last_login": user.last_login,
+                "groups": user.groups.all(),
+            })
+        if new_password != confirm_password:
+            return render(request, "account_info.html", {
+                "success_message": "Mật khẩu mới không khớp!",
+                "username": user.username,
+                "last_name": user.last_name,
+                "first_name": user.first_name,
+                "email": user.email,
+                "last_login": user.last_login,
+                "groups": user.groups.all(),
+            })
+
+        user.set_password(new_password)
+        user.save()
+        update_session_auth_hash(request, user)  # Giữ người dùng đăng nhập
+        return render(request, "account_info.html", {
+            "success_message": "Thay đổi mật khẩu thành công!",
+            "username": user.username,
+            "last_name": user.last_name,
+            "first_name": user.first_name,
+            "email": user.email,
+            "last_login": user.last_login,
+            "groups": user.groups.all(),
+        })
+
+    return redirect("account_info")
+
+#trang thong ke
+@login_required()
+def statistics_view(request):
+    total_image = InsectsImage.objects.count()
+    total_user = User.objects.count()
+    total_class = Class.objects.count()
+    total_order = Order.objects.count()
+    total_family = Family.objects.count()
+    total_genus = Genus.objects.count()
+    total_species = Species.objects.count()
+
+    user_groups = Group.objects.annotate(user_count=Count('user'))
+    order_class = Class.objects.annotate(order_count=Count('order'))
+    family_order = Order.objects.annotate(family_count=Count('family'))
+    genus_family  = Family.objects.annotate(genus_count=Count('genus'))
+    species_genus = Genus.objects.annotate(species_count=Count('species'))
+    img_species = Species.objects.annotate(img_count=Count('insectsimage'))
+
+    return render(request, "statistics.html", {
+        'total_image': total_image,
+        'total_user': total_user,
+        'user_groups': user_groups,
+        'total_class': total_class,
+        'total_order': total_order,
+        'total_family': total_family,
+        'total_genus': total_genus,
+        'total_species': total_species,
+        'order_class': order_class,
+        'family_order': family_order,
+        'genus_family': genus_family,
+        'species_genus': species_genus,
+        'img_species': img_species,
+    })
+
+#thong ke anh con trung
+@login_required()
+def get_species_img_chart(request):
+    Images_by_species = InsectsImage.objects.values('insects__name').annotate(count=Count('img_id')).order_by('-count')
+    species_dict = {s['insects__name']: s['count'] for s in Images_by_species}
+
+    colorPrimary = "#79aec8"
+
+    response_data = {
+        "title": "Số lượng ảnh của từng loài",
+        "data": {
+            "labels": list(species_dict.keys()),
+            "datasets": [{
+                "label": "Số lượng ảnh",
+                "backgroundColor": colorPrimary,
+                "borderColor": colorPrimary,
+                "data": list(species_dict.values())
+            }]
+        }
+    }
+    return JsonResponse(response_data)
+
+
+#thong ke nguoi dung
+@login_required()
+def user_by_group_chart(request):
+    groups = Group.objects.all()
+    labels = []
+    data = []
+
+    for group in groups:
+        labels.append(group.name)
+        data.append(group.user_set.count())
+
+    response_data = {
+        "title": "Thống kê số lượng tài khoản theo nhóm",
+        "data": {
+            "labels": labels,
+            "datasets": [{
+                "label": "Số lượng người dùng",
+                "data": data,
+                "backgroundColor": [
+                    "#FF6384", "#36A2EB", "#FFCE56", "#4CAF50", "#9C27B0"
+                ]
+            }]
+        }
+    }
+    return JsonResponse(response_data)
+
+@login_required()
+def order_by_class_chart(request):
+    classes = Class.objects.annotate(count=Count('order')).order_by('-count')
+    labels = []
+    data = []
+
+    for cls in classes:
+        labels.append(cls.name)
+        data.append(cls.count)
+
+    response_data = {
+        "title": "Thống kê số lượng bộ theo lớp",
+        "data": {
+            "labels": labels,
+            "datasets": [{
+                "label": "Số lượng bộ",
+                "data": data,
+                "backgroundColor": "#4BC0C0"
+            }]
+        }
+    }
+    return JsonResponse(response_data)
+
+@login_required()
+def family_by_order_chart(request):
+    orders = Order.objects.annotate(count=Count('family')).order_by('-count')
+    labels = []
+    data = []
+
+    for order in orders:
+        labels.append(order.name)
+        data.append(order.count)
+
+    response_data = {
+        "title": "Thống kê số lượng họ theo bộ",
+        "data": {
+            "labels": labels,
+            "datasets": [{
+                "label": "Số lượng họ",
+                "data": data,
+                "backgroundColor": "#FF9F40"
+            }]
+        }
+    }
+    return JsonResponse(response_data)
+
+@login_required()
+def genus_by_family_chart(request):
+    families = Family.objects.annotate(count=Count('genus')).order_by('-count')
+    labels = []
+    data = []
+
+    for family in families:
+        labels.append(family.name)
+        data.append(family.count)
+
+    response_data = {
+        "title": "Thống kê số lượng chi theo họ",
+        "data": {
+            "labels": labels,
+            "datasets": [{
+                "label": "Số lượng chi",
+                "data": data,
+                "backgroundColor": "#36A2EB"
+            }]
+        }
+    }
+    return JsonResponse(response_data)
+
+@login_required()
+def species_by_genus_chart(request):
+    genera = Genus.objects.annotate(count=Count('species')).order_by('-count')
+    labels = []
+    data = []
+
+    for genus in genera:
+        labels.append(genus.name)
+        data.append(genus.count)
+
+    response_data = {
+        "title": "Thống kê số lượng loài theo chi",
+        "data": {
+            "labels": labels,
+            "datasets": [{
+                "label": "Số lượng loài",
+                "data": data,
+                "backgroundColor": "#9966FF"
+            }]
+        }
+    }
+    return JsonResponse(response_data)
+
+# manage insect
+@login_required()
+def manage_insect(request):
+    classes = Class.objects.all()
+    order = Order.objects.all()
+    family = Family.objects.all()
+    genus = Genus.objects.all()
+    species = Species.objects.all()
+
+    search_class_query = request.GET.get('search_class', '').strip()
+    if search_class_query:
+        classes = classes.filter(
+            Q(ename__icontains=search_class_query) |
+            Q(name__icontains=search_class_query)
+        )
+
+    search_order_query = request.GET.get('search_order', '').strip()
+    if search_order_query:
+        order = order.filter(
+            Q(ename__icontains=search_order_query) |
+            Q(name__icontains=search_order_query)
+        )
+
+    search_family_query = request.GET.get('search_family', '').strip()
+    if search_family_query:
+        family = family.filter(
+            Q(ename__icontains=search_family_query) |
+            Q(name__icontains=search_family_query)
+        )
+
+    search_genus_query = request.GET.get('search_genus', '').strip()
+    if search_genus_query:
+        genus = genus.filter(
+            Q(ename__icontains=search_genus_query) |
+            Q(name__icontains=search_genus_query)
+        )
+
+    search_species_query = request.GET.get('search_species', '').strip()
+    if search_species_query:
+        species = species.filter(
+            Q(ename__icontains=search_species_query) |
+            Q(name__icontains=search_species_query) |
+            Q(species_name__icontains=search_species_query) |
+            Q(eng_name__icontains=search_species_query) |
+            Q(vi_name__icontains=search_species_query)
+        )
+
+    return render(request, 'manage_insect.html', {
+        'classes': classes,
+        'orders': order,
+        'family': family,
+        'genus': genus,
+        'species': species,
+        'search_class_query': search_class_query,
+        'search_order_query': search_order_query,
+        'search_family_query': search_family_query,
+        'search_genus_query': search_genus_query,
+        'search_species_query': search_species_query,
+        'MEDIA_URL': settings.MEDIA_URL
+    })

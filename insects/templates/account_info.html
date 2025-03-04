@@ -1,0 +1,108 @@
+{% extends "template_v2.html" %}
+{% block content %}
+
+<div class="container d-flex justify-content-center">
+    <div style="max-width: 600px; width: 100%;">
+        <h2 class="text-center">Thông Tin Tài Khoản</h2>
+        <div class="card mt-3">
+        <div class="card-body">
+            <p><strong>Tên đăng nhập:</strong> {{ username }}</p>
+            <p><strong>Họ lót:</strong> {{ last_name }}</p>
+            <p><strong>Tên:</strong> {{ first_name }}</p>
+            <p><strong>Email:</strong> {{ email }}</p>
+            <p><strong>Đăng nhập lần cuối:</strong> {{ last_login }}</p>
+            <p><strong>Phân quyền:</strong>
+                {% for group in groups %}
+                   {{ group }}
+                {% endfor %}
+            </p>
+            <button class="btn btn-primary mt-3" data-bs-toggle="modal" data-bs-target="#editInfoModal">Chỉnh sửa thông tin</button>
+            <button class="btn btn-primary mt-3" data-bs-toggle="modal" data-bs-target="#changePasswordModal">Đổi mật khẩu</button>
+        </div>
+    </div>
+    </div>
+</div>
+
+<!-- Modal Chỉnh Sửa Thông Tin -->
+<div class="modal fade" id="editInfoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Chỉnh Sửa Thông Tin</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'edit_account' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <label>Tên đăng nhập:</label>
+                    <input type="text" name="username" class="form-control" value="{{ username }}">
+                    <label>Họ lót:</label>
+                    <input type="text" name="last_name" class="form-control" value="{{ last_name }}">
+                    <label>Tên:</label>
+                    <input type="text" name="first_name" class="form-control" value="{{ first_name }}">
+                    <label>Email:</label>
+                    <input type="email" name="email" class="form-control" value="{{ email }}">
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Đổi Mật Khẩu -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Đổi Mật Khẩu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'change_password' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <label>Mật khẩu cũ:</label>
+                    <input type="password" name="old_password" class="form-control" required>
+                    <label>Mật khẩu mới:</label>
+                    <input type="password" name="new_password" class="form-control" required>
+                    <label>Xác nhận mật khẩu mới:</label>
+                    <input type="password" name="confirm_password" class="form-control" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Đổi mật khẩu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% if success_message %}
+<!-- Modal Thông Báo Thành Công -->
+<div class="modal fade" id="successModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Thành công</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {{ success_message }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var successMessage = "{{ success_message|escapejs }}";
+        if (successMessage) {
+            var successModal = new bootstrap.Modal(document.getElementById('successModal'));
+            successModal.show();
+        }
+    });
+</script>
+
+{% endif %}
+
+{% endblock %}
