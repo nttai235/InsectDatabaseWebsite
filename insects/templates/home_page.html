@@ -4,7 +4,8 @@
 
 
        <!-- Carousel Start -->
-<div class="container-fluid carousel-header vh-100 px-0">
+<div class="container-fluid carousel-header vh-100 px-0" xmlns:cls.class_id xmlns:cls.class_id xmlns:cls.class_id
+     xmlns:cls.class_id xmlns:species.id xmlns:species.id>
             <div id="carouselId" class="carousel slide" data-bs-ride="carousel">
                 <ol class="carousel-indicators">
                     <li data-bs-target="#carouselId" data-bs-slide-to="0" class="active"></li>
@@ -66,32 +67,206 @@
             </div>
         </div>
 
+<style>
+    /* Card hiển thị ảnh */
+    .image-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 5px;
+        transition: transform 0.3s ease-in-out;
+    }
 
+    /* Hiệu ứng phóng to nhẹ khi hover */
+    .image-card:hover {
+        transform: scale(1.05);
+    }
 
-<div style="background-color: #F5F5F5;">
-    <div class="row mt-3 ">
+    /* Overlay gradient xuất hiện từ dưới lên */
+    .overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 0;
+        background: linear-gradient(to top, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0));
+        transition: height 0.4s ease-in-out;
+    }
+
+    /* Khi hover, overlay hiển thị dần từ dưới lên */
+    .image-card:hover .overlay {
+        height: 50%;
+    }
+
+    /* Ẩn button mặc định */
+    .card-buttons {
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100%);
+        display: flex;
+        gap: 8px;
+        opacity: 0;
+        flex-wrap: nowrap;
+        justify-content: center;
+        white-space: nowrap;
+        transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+    }
+
+    /* Khi hover, button xuất hiện từ dưới lên */
+    .image-card:hover .card-buttons {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+
+    /* Nút button đẹp hơn */
+    .card-buttons a {
+        text-decoration: none;
+        border-radius: 5px;
+        transition: background-color 0.2s ease-in-out;
+    }
+</style>
+
+<div class="container-fluid mt-3">
+    <div class="row">
+        <form method="get" class="mb-3 p-3 rounded shadow bg-light">
+            <div class="row g-2 align-items-center">
+                <div class="col-auto">
+                    <label for="classification" class="fw-bold">Chọn phân loại:</label>
+                </div>
+                <div class="col-md-3">
+                    <select name="classification" id="classification" class="form-select">
+                        <option value="class" {% if request.GET.classification == "class" %}selected{% endif %}>Lớp</option>
+                        <option value="order" {% if request.GET.classification == "order" %}selected{% endif %}>Bộ</option>
+                        <option value="family" {% if request.GET.classification == "family" %}selected{% endif %}>Họ</option>
+                        <option value="genus" {% if request.GET.classification == "genus" %}selected{% endif %}>Chi</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select name="species" id="species" class="form-select">
+                        <option value="">Tất cả</option>
+                        {% for species in species_lst %}
+                        <option value="{{ species.id }}" {% if species.id|stringformat:"s" == request.GET.species %}selected{% endif %}>{{ species.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary" id="filter-button">
+                        <i class="bi bi-funnel"></i> Lọc
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-secondary" id="reset-button">
+                        <i class="bi bi-arrow-clockwise"></i> Làm mới
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="row">
+        {% if species_lst %}
         {% for spc in species_lst %}
-             <div class="align-items-center col-sm-6 col-md-4 col-lg-3 mb-3 image-card" data-img-id="${spc.img_id}">
-            <div class="card">
-                    <svg class="img-fluid" viewBox="0 0 {{ spc.width }} {{ spc.height }}" data-insect-id="{{ spc.insects_id }}" data-insect-slug="{{ spc.slug }}">
-                            <a  href= '/load_specie_image/?page=1&specie_id={{spc.insects_id}}'><image href="{{ MEDIA_URL }}{{spc.thumbnail}}" data-src="{{ MEDIA_URL }}{{spc.thumbnail }}" height="100%" width="100%"/></a>
-<!--                        <image href="{{ MEDIA_URL }}{{ spc.thumbnail }}" data-src="{{ MEDIA_URL }}{{ spc.thumbnail }}" height="100%" width="100%" />-->
-                    </svg>
-                     <p  class="text-center fw-bold fs-9">{{spc.vi_name}} ({{spc.name}})</p>
-<!--                <div>-->
-<!--                    <p  class="fw-bold fs-9">{{spc.name}}</p>-->
-<!--                    </div>-->
+        <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
+            <div class="image-card">
+                <!-- SVG hiển thị ảnh -->
+                <svg class="img-fluid" viewBox="0 0 {{ spc.width }} {{ spc.height }}" data-insect-id="{{ spc.insects_id }}" data-insect-slug="{{ spc.slug }}">
+                    <image href="{{ MEDIA_URL }}{{ spc.thumbnail }}" height="100%" width="100%"/>
+                </svg>
+
+                <div class="overlay"></div>
+
+                <div class="card-buttons">
+                    <a href="{% url 'detail' slug=spc.slug %}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-info-circle"></i> Chi tiết
+                    </a>
+                    <a href="/load_specie_image/?page=1&specie_id={{ spc.insects_id }}" class="btn btn-secondary btn-sm">
+                        <i class="bi bi-images"></i> Hình ảnh
+                    </a>
+                    <a href="{% url '3d_model' slug=spc.slug %}" class="btn btn-secondary btn-sm">
+                        <i class="bi bi-box"></i> Mô hình 3D
+                    </a>
+                </div>
+                <div class="card-footer text-center">
+                    <p>{{ spc.vi_name }} ({{ spc.name }})</p>
+                </div>
             </div>
         </div>
-
         {% endfor %}
+        {% else %}
+        <div class="alert alert-primary text-center" role="alert">
+            Không có loài nào...
+        </div>
+        {% endif %}
     </div>
-
 </div>
-
-
 <!--Scripts-->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        let classificationSelect = document.getElementById("classification");
+        let speciesSelect = document.getElementById("species");
+
+        function loadSpeciesOptions(selectedType) {
+            if (!selectedType) {
+                speciesSelect.innerHTML = '<option value="">Tất cả</option>';
+                return;
+            }
+
+            fetch(`/get_species_options/?type=${selectedType}`)
+                .then(response => response.json())
+                .then(data => {
+                    speciesSelect.innerHTML = '<option value="">Tất cả</option>';
+                    data.data.forEach(item => {
+                        let option = document.createElement("option");
+                        option.value = item[`${selectedType}_id`];
+                        option.textContent = item.ename;
+                        speciesSelect.appendChild(option);
+                    });
+
+                    let currentSelection = "{{ request.GET.species|default_if_none:'' }}";
+                    if (currentSelection) {
+                        speciesSelect.value = currentSelection;
+                    }
+                })
+                .catch(error => console.error("Lỗi:", error));
+        }
+
+        classificationSelect.addEventListener("change", function () {
+            loadSpeciesOptions(this.value);
+        });
+
+        window.addEventListener("load", function () {
+            let savedScrollPosition = localStorage.getItem("scrollPosition");
+            if (savedScrollPosition) {
+                setTimeout(() => {
+                    window.scrollTo(0, savedScrollPosition);
+                }, 100);
+            }
+        });
+
+
+        document.querySelector("form").addEventListener("submit", function () {
+            localStorage.setItem("scrollPosition", window.scrollY);
+        });
+
+        document.getElementById("filter-button").addEventListener("click", function () {
+            localStorage.setItem("scrollPosition", window.scrollY);
+            window.location.href = window.location.pathname;
+        });
+
+        document.getElementById("reset-button").addEventListener("click", function () {
+            localStorage.setItem("scrollPosition", window.scrollY);
+            window.location.href = window.location.pathname;
+        });
+
+        window.addEventListener("pageshow", function () {
+            localStorage.removeItem("scrollPosition");
+        });
+
+        if (classificationSelect.value) {
+            loadSpeciesOptions(classificationSelect.value);
+        }
+    });
+</script>
 
 {% endblock %}
 

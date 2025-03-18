@@ -2,6 +2,26 @@
 {% load custom_filters %}
 {% block content %}
 <div class="container mt-4">
+    <!-- Modal Thông báo -->
+    <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="successModalLabel">Thông báo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% for message in messages %}
+                        {{ message }}
+                    {% endfor %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <h2 class="my-3">Quản lý côn trùng</h2>
     <nav class="mb-3">
         <div class="nav nav-tabs" id="nav-tab" role="tablist">
@@ -15,7 +35,7 @@
     <div class="tab-content mb-3" id="nav-tabContent">
         <!--======================================================= Quản lý lớp =======================================================-->
         <div class="tab-pane fade show active" id="nav-class" role="tabpanel" aria-labelledby="nav-class-tab" tabindex="0">
-            <a href="#" class="btn btn-primary mb-3">
+            <a href="{% url 'add_class' %}" class="btn btn-primary mb-3">
                 <i class="bi bi-plus-circle"></i> Thêm lớp
             </a>
             <form method="GET" class="row mb-3 g-2 align-items-center">
@@ -52,12 +72,12 @@
                             <td>{{ class.slug }}</td>
                             <td>{{ class.phylum }}</td>
                             <td>
-                                <a href="#">
-                                    <i class="bi bi-pencil-square"></i>
+                                <a href="{% url 'edit_class' class.class_id %}">
+                                    <i class="bi bi-pencil-square text-warning"></i>
                                 </a>
                             </td>
                             <td>
-                                <a href="#">
+                                <a href="#" data-bs-toggle="modal" data-bs-target="#deleteClassModal{{ class.class_id }}">
                                     <i class="bi bi-trash-fill text-danger"></i>
                                 </a>
                             </td>
@@ -72,7 +92,7 @@
         </div>
         <!--======================================================= Quản lý bộ =======================================================-->
         <div class="tab-pane fade" id="nav-order" role="tabpanel" aria-labelledby="nav-order-tab" tabindex="1">
-            <a href="#" class="btn btn-primary mb-3">
+            <a href="{% url 'add_order' %}" class="btn btn-primary mb-3">
                 <i class="bi bi-plus-circle"></i> Thêm bộ
             </a>
             <form method="GET" class="row mb-3 g-2 align-items-center">
@@ -109,12 +129,12 @@
                             <td>{{ order.slug }}</td>
                             <td>{{ order.class_field }}</td>
                             <td>
-                                <a href="#">
-                                    <i class="bi bi-pencil-square"></i>
+                                <a href="{% url 'edit_order' order.order_id %}">
+                                    <i class="bi bi-pencil-square text-warning"></i>
                                 </a>
                             </td>
                             <td>
-                                <a href="#">
+                                <a href="#" data-bs-toggle="modal" data-bs-target="#deleteOrderModal{{ order.order_id }}">
                                     <i class="bi bi-trash-fill text-danger"></i>
                                 </a>
                             </td>
@@ -129,7 +149,7 @@
         </div>
         <!--======================================================= Quản lý họ =======================================================-->
         <div class="tab-pane fade" id="nav-family" role="tabpanel" aria-labelledby="nav-family-tab" tabindex="2">
-            <a href="#" class="btn btn-primary mb-3">
+            <a href="{% url 'add_family' %}" class="btn btn-primary mb-3">
                 <i class="bi bi-plus-circle"></i> Thêm họ
             </a>
             <form method="GET" class="row mb-3 g-2 align-items-center">
@@ -151,7 +171,7 @@
                             <th scope="col">Tên khoa học</th>
                             <th scope="col">Tên</th>
                             <th scope="col">Slug</th>
-                            <th scope="col">Lớp</th>
+                            <th scope="col">Bộ</th>
                             <th></th>
                             <th></th>
                         </tr>
@@ -166,12 +186,12 @@
                             <td>{{ fa.slug }}</td>
                             <td>{{ fa.order }}</td>
                             <td>
-                                <a href="#">
-                                    <i class="bi bi-pencil-square"></i>
+                                <a href="{% url 'edit_family' fa.family_id %}">
+                                    <i class="bi bi-pencil-square text-warning"></i>
                                 </a>
                             </td>
                             <td>
-                                <a href="#">
+                                <a href="#" data-bs-toggle="modal" data-bs-target="#deleteFamilyModal{{ fa.family_id }}">
                                     <i class="bi bi-trash-fill text-danger"></i>
                                 </a>
                             </td>
@@ -186,7 +206,7 @@
         </div>
         <!--======================================================= Quản lý chi =======================================================-->
         <div class="tab-pane fade" id="nav-genus" role="tabpanel" aria-labelledby="nav-genus-tab" tabindex="3">
-            <a href="#" class="btn btn-primary mb-3">
+            <a href="{% url 'add_genus' %}" class="btn btn-primary mb-3">
                 <i class="bi bi-plus-circle"></i> Thêm chi
             </a>
             <form method="GET" class="row mb-3 g-2 align-items-center">
@@ -223,12 +243,12 @@
                             <td>{{ ge.slug }}</td>
                             <td>{{ ge.family }}</td>
                             <td>
-                                <a href="#">
-                                    <i class="bi bi-pencil-square"></i>
+                                <a href="{% url 'edit_genus' ge.genus_id %}">
+                                    <i class="bi bi-pencil-square text-warning"></i>
                                 </a>
                             </td>
                             <td>
-                                <a href="#">
+                                <a href="#" data-bs-toggle="modal" data-bs-target="#deleteGenusModal{{ ge.genus_id }}">
                                     <i class="bi bi-trash-fill text-danger"></i>
                                 </a>
                             </td>
@@ -244,7 +264,7 @@
         </div>
         <!--======================================================= Quản lý loài =======================================================-->
         <div class="tab-pane fade" id="nav-species" role="tabpanel" aria-labelledby="nav-species-tab" tabindex="4">
-            <a href="#" class="btn btn-primary mb-3">
+            <a href="{% url 'add_species' %}" class="btn btn-primary mb-3">
                 <i class="bi bi-plus-circle"></i> Thêm loài
             </a>
             <form method="GET" class="row mb-3 g-2 align-items-center">
@@ -265,7 +285,7 @@
                             <th scope="col">ID</th>
                             <th scope="col">Thumbnail</th>
                             <th scope="col">Tên khoa học</th>
-                            <th scope="col">Tên</th>
+                            <th scope="col">Tên thường gọi</th>
                             <th scope="col">Tên loài</th>
                             <th scope="col">Tên Tiếng Anh</th>
                             <th scope="col">Tên Tiếng Việt</th>
@@ -276,6 +296,7 @@
                             <th scope="col">Tập tính</th>
                             <th scope="col">Biện pháp phòng ngừa</th>
                             <th scope="col">Chi</th>
+                            <th></th>
                             <th></th>
                             <th></th>
                         </tr>
@@ -301,25 +322,146 @@
                             <td>{{ sp.protection_method|truncatewords:10 }}</td>
                             <td>{{ sp.genus }}</td>
                             <td>
-                                <a href="#">
-                                    <i class="bi bi-pencil-square"></i>
+                                <a href="{% url 'detail' sp.slug %}">
+                                    <i class="bi bi-info-circle text-success"></i>
                                 </a>
                             </td>
                             <td>
-                                <a href="#">
+                                <a href="{% url 'edit_species' sp.insects_id %}">
+                                    <i class="bi bi-pencil-square text-warning"></i>
+                                </a>
+                            </td>
+                            <td>
+                                <a href="#" data-bs-toggle="modal" data-bs-target="#deleteSpeciesModal{{ sp.insects_id }}">
                                     <i class="bi bi-trash-fill text-danger"></i>
                                 </a>
                             </td>
                         </tr>
                         {% endfor %}
                     {% else %}
-                        <td colspan="8" class="text-center text-muted">Không có loài nào.</td>
+                        <td colspan="17" class="text-center text-muted">Không có loài nào.</td>
                     {% endif %}
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
+<!--    ================================Các Modal xóa==================================-->
+    <!-- Modal Xóa lớp -->
+    {% for class in classes %}
+    <div class="modal fade" id="deleteClassModal{{ class.class_id }}" tabindex="-1" aria-labelledby="deleteClassModalLabel{{ class.class_id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteClassModalLabel{{ class.class_id }}">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Bạn có chắc chắn muốn xóa lớp <strong>{{ class.ename }}</strong> không?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <form method="POST" action="{% url 'delete_class' class.class_id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">Xóa</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    <!-- Modal Xóa bộ -->
+    {% for order in orders %}
+    <div class="modal fade" id="deleteOrderModal{{ order.order_id }}" tabindex="-1" aria-labelledby="deleteOrderModalLabel{{ order.order_id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteOrderModalLabel{{ order.order_id }}">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Bạn có chắc chắn muốn xóa bộ <strong>{{ order.ename }}</strong> không?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <form method="POST" action="{% url 'delete_order' order.order_id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">Xóa</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    <!-- Modal Xóa họ -->
+    {% for fa in family %}
+    <div class="modal fade" id="deleteFamilyModal{{ fa.family_id }}" tabindex="-1" aria-labelledby="deleteFamilyModalLabel{{ fa.family_id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteFamilyModalLabel{{ fa.family_id }}">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Bạn có chắc chắn muốn xóa họ <strong>{{ fa.ename }}</strong> không?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <form method="POST" action="{% url 'delete_family' fa.family_id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">Xóa</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    <!-- Modal Xóa chi -->
+    {% for ge in genus %}
+    <div class="modal fade" id="deleteGenusModal{{ ge.genus_id }}" tabindex="-1" aria-labelledby="deleteGenusModalLabel{{ ge.genus_id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteGenusModalLabel{{ ge.genus_id }}">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Bạn có chắc chắn muốn xóa chi <strong>{{ ge.ename }}</strong> không?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <form method="POST" action="{% url 'delete_genus' ge.genus_id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">Xóa</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    <!-- Modal Xóa loài -->
+    {% for sp in species %}
+    <div class="modal fade" id="deleteSpeciesModal{{ sp.insects_id }}" tabindex="-1" aria-labelledby="deleteSpeciesModalLabel{{ sp.insects_id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteSpeciesModalLabel{{ sp.insects_id }}">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Bạn có chắc chắn muốn xóa loài <strong>{{ sp.ename }}</strong> không?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <form method="POST" action="{% url 'delete_species' sp.insects_id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">Xóa</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
 </div>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
@@ -328,7 +470,11 @@
 
         // Nếu có tab được lưu, kích hoạt nó
         if (activeTab) {
-            let tabElement = document.querySelector(`#${activeTab}`);
+            // let tabElement = document.querySelector(`#${activeTab}`);
+
+            let cleanTabId = activeTab.replace(/['"#]/g, "");
+            let tabElement = document.getElementById(cleanTabId);
+
             if (tabElement) {
                 new bootstrap.Tab(tabElement).show();
             }
@@ -340,6 +486,15 @@
                 localStorage.setItem("activeTab", this.id);
             });
         });
+    });
+</script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var hasMessage = {{ messages|length|yesno:"true,false" }};
+        if (hasMessage) {
+            var successModal = new bootstrap.Modal(document.getElementById('successModal'));
+            successModal.show();
+        }
     });
 </script>
 

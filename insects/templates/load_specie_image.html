@@ -1,5 +1,6 @@
 {% extends "template_v2.html" %}
 {% load static %}
+{% load group_filters %}
 {% block content %}
 
 <!-- Modal HTML Markup -->
@@ -17,48 +18,33 @@
                         
                     </svg>
                 </div>
-            </div>
-            <div class="container d-flex align-items-center justify-content-center mb-2">
-                <div class="container d-flex align-items-center justify-content-center mb-2">
-                    <button id="detailsButton" class="btn btn-success mx-1" data-slug="">Chi tiết</button>
-                    <button id="3dButton" class="btn btn-warning mx-1" data-slug="">Mô hình 3D</button>
+                <hr>
+                <div style="position: relative;">
+                    <p class="fw-bold">Mô tả</p>
+                    <div id="imageDescription" class="mt-3"></div>
                 </div>
             </div>
+            {% if request.user.is_authenticated %}
+                {% if request.user|has_group:"Users" %}
+                <div class="modal-footer align-items-center justify-content-center mb-2">
+                    <div class="container d-flex align-items-center justify-content-center mb-2">
+                        <button id="detailsButton" class="btn btn-success mx-1" data-slug="">Chi tiết</button>
+    <!--                    <button id="3dButton" class="btn btn-warning mx-1" data-slug="">Mô hình 3D</button>-->
+                    </div>
+                </div>
+                {% endif %}
+            {% endif %}
         </div>
     </div>
 </div>
 
 <div style="background-color: #F5F5F5;">
-<!--     <div class="d-flex justify-content-center">-->
-<!--            <p class="fw-bold fs-2">{{ specie_info.vi_name }} - {{ specie_info.name }}</p>-->
-<!--     </div>-->
-<!--    <div class="row mt-3 ">-->
-
-<!--        {% for image in page_obj %}-->
-<!--&lt;!&ndash;            <div class="d-flex flex-wrap col-sm-6 col-md-4 col-lg-3 mb-3 image-card">&ndash;&gt;-->
-<!--&lt;!&ndash;                 <div class="card">&ndash;&gt;-->
-<!--         <div class="d-flex flex-wrap col-sm-6 col-md-4 col-lg-3 mb-3 image-card" data-img-id="${image.img_id}">-->
-<!--            <div class="card">-->
-<!--                    <svg class="img-fluid" viewBox="0 0 40 40" data-insect-id="{{ image.insects.insects_id }}" data-insect-slug="{{ image.insects.slug }}">-->
-<!--                        <image href="{{ MEDIA_URL }}{{ image.url }}" data-src="{{ MEDIA_URL }}{{ image.url }}" height="100%" width="100%" />-->
-<!--                        {% for bbox in image.bboxes.all %}-->
-<!--                        {% with text_x=bbox.x|add:2 text_y=bbox.y|add:15 %}-->
-<!--                            <rect x="{{ bbox.x }}" y="{{ bbox.y }}" width="{{ bbox.width }}" height="{{ bbox.height }}" style="stroke:red;stroke-width:2;fill-opacity:0" />-->
-<!--                            <text x="{{ text_x }}" y="{{ text_y }}" fill="red" class="bbox-text" font-size="18">{{ image.insects.name }}</text>-->
-<!--                        {% endwith %}-->
-<!--                        {% endfor %}-->
-<!--                    </svg>-->
-<!--&lt;!&ndash;                 </div>&ndash;&gt;-->
-<!--            </div>-->
-<!--         </div>-->
-<!--        {% endfor %}-->
-<!--    </div>-->
-         <div class="d-flex justify-content-center">
-            <p class="fw-bold fs-2">{{ specie_info.vi_name }} - {{ specie_info.name }}</p>
+     <div class="d-flex justify-content-center">
+        <p class="fw-bold fs-2">{{ specie_info.vi_name }} - {{ specie_info.name }}</p>
      </div>
      <div class="row mt-3 ">
         {% for image in page_obj %}
-            <div class="d-flex flex-wrap col-sm-6 col-md-4 col-lg-3 mb-3">
+            <div class="d-flex flex-wrap col-sm-6 col-md-4 col-lg-3 mb-3"  data-desc="{{ image.desc }}">
                 <!-- <div class="card"> -->
                     <svg class="img-fluid" viewBox="0 0 {{ image.width }} {{ image.height }}" data-insect-id="{{ image.insects.insects_id }}" data-insect-slug="{{ image.insects.slug }}">
                         <image href="{{ MEDIA_URL }}{{ image.url }}" data-src="{{ MEDIA_URL }}{{ image.url }}" height="100%" width="100%" />
@@ -133,10 +119,11 @@
         var viewBox = $(this).attr('viewBox'); // Get the viewBox from the SVG
         var insectId = $(this).data('insect-id'); // Get the insect ID from the SVG's data attributes
         var insectSlug = $(this).data('insect-slug'); // Retrieve the slug from the data attribute
-        openModal(imageUrl, bboxesData, insectName, insectId, viewBox, insectSlug);
+        var imageDesc = $(this).closest('.d-flex').data('desc');
+        openModal(imageUrl, bboxesData, insectName, insectId, viewBox, insectSlug, imageDesc);
     });
 
-    function openModal(imageUrl, bboxesData, insectName, insectId, viewBox, insectSlug) {
+    function openModal(imageUrl, bboxesData, insectName, insectId, viewBox, insectSlug, imageDesc) {
         var id = insectId;
         var slug = insectSlug
         $('#imageModalLabel').text(insectName);
@@ -145,8 +132,11 @@
         $('#modalSvg').empty();
 
         $('#detailsButton').attr('data-slug', insectSlug);
-        $('#3dButton').attr('data-slug', insectSlug);
+<!--        $('#3dButton').attr('data-slug', insectSlug);-->
         $('#imageModal').modal('show');
+
+        $('#imageDescription').text((imageDesc && imageDesc !== "None") ? imageDesc : 'Không có mô tả.');
+
         // Add bounding boxes and text to the SVG
         bboxesData.forEach(function(bbox) {
             var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -169,22 +159,23 @@
         $('#imageModal').modal('show');
     }
         $('#detailsButton').on('click', function() {
-        var slug = $(this).data('slug'); 
-        if (slug) {
-            window.location.href = '/detail/' + slug + '/';
-        } else {
-            console.error('Slug is missing');
-        }
-    });
+            var imgId = $('#modalImage').attr('src').split('/').pop().split('.')[0];
+            if (imgId) {
+                window.location.href = '/add_desc_step2/?img_id=' + imgId;
+            } else {
+                console.error('Image ID is missing');
+            }
+        });
 
-        $('#3dButton').on('click', function() {
-        var slug = $(this).data('slug');
-        if (slug) {
-            window.location.href = '/3d_model/' + slug + '/';
-        } else {
-            console.error('Slug is missing');
-        }
-    });
+
+<!--        $('#3dButton').on('click', function() {-->
+<!--        var slug = $(this).data('slug');-->
+<!--        if (slug) {-->
+<!--            window.location.href = '/3d_model/' + slug + '/';-->
+<!--        } else {-->
+<!--            console.error('Slug is missing');-->
+<!--        }-->
+<!--    });-->
 
     $(document).ready(function() {
         $('#chk_insect_name').change(function() {

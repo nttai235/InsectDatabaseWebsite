@@ -1,178 +1,180 @@
 {% extends "template_v2.html" %}
 {% block content %}
-<div class="container d-flex flex-column align-items-center justify-content-center vh-100">
-    <div class="mt-3">
-        <h1 >Gán nhãn</h1>
+<div class="container d-flex flex-column align-items-center justify-content-center pb-4">
+    <div class="mt-3 text-center">
+        <h2 class="fw-bold">Gán nhãn hình ảnh</h2>
     </div>
-    <div class="my-3">
-        <canvas id="c" style="border:1px solid #ccc"></canvas>
+    <div class="my-3 position-relative">
+        <canvas id="c" class="border rounded"></canvas>
     </div>
-    <div>
-        <button id="saveBboxes" class="btn btn-success mt-2">Lưu</button>
-        <button id="deleteAllBboxes" class="btn btn-danger mt-2 ms-2">Xóa tất cả nhãn</button>
+    <div class="d-flex gap-2">
+        <button id="undo" class="btn btn-secondary"><i class="bi bi-arrow-counterclockwise"></i> Undo</button>
+        <button id="redo" class="btn btn-secondary"><i class="bi bi-arrow-clockwise"></i> Redo</button>
+        <button id="saveBboxes" class="btn btn-success"><i class="bi bi-floppy2-fill"></i> Lưu</button>
+        <button id="deleteAllBboxes" class="btn btn-danger"><i class="bi bi-trash"></i> Xóa tất cả</button>
+    </div>
+</div>
+
+<!-- Modal thông báo lưu thành công -->
+<div class="modal fade" id="saveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Thông báo</h5>
+            </div>
+            <div class="modal-body">
+                Đã cập nhật Bounding Box!
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="okButton">OK</button>
+            </div>
+        </div>
     </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.3.0/fabric.min.js"></script>
-
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const canvasElement = document.getElementById('c');
-    const canvas = new fabric.Canvas(canvasElement, {
-        preserveObjectStacking: true,
-    });
-    let isDown = false;
-    let origX, origY;
-    let rect;
-    const imgId = new URLSearchParams(window.location.search).get('imgId');
+    document.addEventListener('DOMContentLoaded', function() {
+        const canvasElement = document.getElementById('c');
+        const canvas = new fabric.Canvas(canvasElement, { preserveObjectStacking: true });
 
-    // Convert YOLO format to pixel for display
-    function convertYoloToPixel(x, y, width, height, imgWidth, imgHeight) {
-        const xCenter = x * imgWidth;
-        const yCenter = y * imgHeight;
-        const boxWidth = width * imgWidth;
-        const boxHeight = height * imgHeight;
-        const xTopLeft = xCenter - (boxWidth / 2);
-        const yTopLeft = yCenter - (boxHeight / 2);
-        return { x: xTopLeft, y: yTopLeft, width: boxWidth, height: boxHeight };
-    }
+        let imgId = new URLSearchParams(window.location.search).get('imgId');
+        let history = [], redoStack = [];
 
-    document.addEventListener('keydown', function(e) {
-        if(e.key === 'Delete'){
-            let activeObject = canvas.getActiveObject();
-            if(activeObject){
-                canvas.remove(activeObject);
-                canvas.discardActiveObject().renderAll(); // Deselect and update the canvas
-            }
-        }
-    });
+        // Fetch and display image
+        fetch(`/get_image_data/?imgId=${imgId}`)
+            .then(response => response.json())
+            .then(data => {
+                fabric.Image.fromURL(data.url, function(oImg) {
+                    let fixedHeight = 500; // Cố định chiều cao là 600px
+                    let scaleFactor = fixedHeight / oImg.height;
+                    let newWidth = oImg.width * scaleFactor;
 
-    // Fetch and display image and existing bounding boxes
-    fetch(`/get_image_data/?imgId=${imgId}`)
-    .then(response => response.json())
-    .then(data => {
-        fabric.Image.fromURL(data.url, function(oImg) {
-            canvas.setWidth(oImg.width);
-            canvas.setHeight(oImg.height);
-            oImg.set({ left: 0, top: 0, selectable: false });
-            canvas.setBackgroundImage(oImg, canvas.renderAll.bind(canvas));
+                    canvas.setWidth(newWidth);
+                    canvas.setHeight(fixedHeight);
 
-            // Display existing bounding boxes
-            data.bboxes.forEach(bbox => {
-                const { x, y, width, height } = convertYoloToPixel(bbox.x, bbox.y, bbox.width, bbox.height, oImg.width, oImg.height);
-                let bboxRect = new fabric.Rect({
-                    left: x,
-                    top: y,
-                    width: width,
-                    height: height,
-                    fill: 'transparent',
-                    stroke: 'red',
-                    strokeWidth: 2,
-                    selectable: true,
+                    oImg.set({
+                        left: 0,
+                        top: 0,
+                        scaleX: scaleFactor,
+                        scaleY: scaleFactor,
+                        selectable: false
+                    });
+
+                    canvas.setBackgroundImage(oImg, canvas.renderAll.bind(canvas));
+
+                    data.bboxes.forEach(bbox => {
+                        let { x, y, width, height } = convertYoloToPixel(
+                            bbox.x, bbox.y, bbox.width, bbox.height,
+                            oImg.width, oImg.height
+                        );
+
+                        // Điều chỉnh bbox theo scaleFactor
+                        let bboxRect = createBBox(x * scaleFactor, y * scaleFactor, width * scaleFactor, height * scaleFactor);
+                        canvas.add(bboxRect);
+                    });
                 });
-                canvas.add(bboxRect);
             });
-        });
-    });
 
-    // Drawing new bounding boxes
-    let bboxRect, isDrawing = false;
-    canvas.on('mouse:down', function(o) {
-        if (canvas.getActiveObject()) {
-            // If an existing object is active, we are likely intending to drag, not create a new box
-            isDrawing = false;
-            return;
-        } else {
-            isDrawing = true; // Set to true to enable drawing a new box
+
+        function convertYoloToPixel(x, y, width, height, imgWidth, imgHeight) {
+            let xCenter = x * imgWidth, yCenter = y * imgHeight;
+            let boxWidth = width * imgWidth, boxHeight = height * imgHeight;
+            return {
+                x: xCenter - boxWidth / 2,
+                y: yCenter - boxHeight / 2,
+                width: boxWidth,
+                height: boxHeight
+            };
+        }
+
+        function createBBox(x, y, width, height) {
+            return new fabric.Rect({
+                left: x, top: y, width: width, height: height,
+                fill: 'rgba(255, 0, 0, 0.3)', stroke: 'red', strokeWidth: 2,
+                selectable: true, hasControls: true, cornerSize: 8
+            });
+        }
+
+        let isDrawing = false, rect;
+        canvas.on('mouse:down', function(o) {
+            if (canvas.getActiveObject()) return;
+            isDrawing = true;
             let pointer = canvas.getPointer(o.e);
-            let origX = pointer.x;
-            let origY = pointer.y;
-            rect = new fabric.Rect({
-                left: origX,
-                top: origY,
-                width: pointer.x - origX,
-                height: pointer.y - origY,
-                fill: 'rgba(255, 0, 0, 0.5)',
-                stroke: 'red',
-                strokeWidth: 2,
-            });
+            rect = createBBox(pointer.x, pointer.y, 0, 0);
             canvas.add(rect);
-        }
-    });
+            saveState();
+        });
 
-    canvas.on('mouse:down', function(options) {
-        if(options.button === 3){ // Right click
-            let clickedObject = canvas.getActiveObject();
-            if(clickedObject){
-                canvas.remove(clickedObject);
-                canvas.discardActiveObject().renderAll(); // Deselect and update the canvas
+        canvas.on('mouse:move', function(o) {
+            if (!isDrawing) return;
+            let pointer = canvas.getPointer(o.e);
+            rect.set({ width: Math.abs(pointer.x - rect.left), height: Math.abs(pointer.y - rect.top) });
+            canvas.renderAll();
+        });
+
+        canvas.on('mouse:up', function() {
+            isDrawing = false;
+            saveState();
+        });
+
+        document.getElementById('deleteAllBboxes').addEventListener('click', function() {
+            saveState();
+            canvas.getObjects().forEach(obj => canvas.remove(obj));
+            canvas.renderAll();
+        });
+
+        document.getElementById('saveBboxes').addEventListener('click', function() {
+            const bboxes = canvas.getObjects().map(obj => ({
+                x: (obj.left + obj.width / 2) / canvas.width,
+                y: (obj.top + obj.height / 2) / canvas.height,
+                width: obj.width / canvas.width,
+                height: obj.height / canvas.height,
+            }));
+
+            fetch(`/save_bboxes/?imgId=${imgId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                body: JSON.stringify({ bboxes: bboxes }),
+            })
+                .then(() => {
+                    let modal = new bootstrap.Modal(document.getElementById('saveModal'));
+                    modal.show();
+                })
+                .catch(error => console.error('Lỗi khi lưu:', error));
+        });
+
+        document.getElementById('okButton').addEventListener('click', function() {
+            window.location.href = "/manage_label_n_bbox";
+        });
+
+        document.getElementById('undo').addEventListener('click', function() {
+            if (history.length > 1) {
+                redoStack.push(history.pop());
+                canvas.loadFromJSON(history[history.length - 1], canvas.renderAll.bind(canvas));
             }
-        }
-    });
-
-    canvasElement.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-    });
-
-    // Event listener for "Delete All Bounding Boxes" button
-    document.getElementById('deleteAllBboxes').addEventListener('click', function() {
-        canvas.getObjects('rect').forEach(function(obj) {
-            canvas.remove(obj);
         });
-    });
 
-    canvas.on('mouse:move', function(o) {
-        if (!isDrawing) return;
-        let pointer = canvas.getPointer(o.e);
-        let width = Math.abs(pointer.x - rect.left);
-        let height = Math.abs(pointer.y - rect.top);
-        if (pointer.x < rect.left) {
-            rect.set({ left: pointer.x });
-        }
-        if (pointer.y < rect.top) {
-            rect.set({ top: pointer.y });
-        }
-        rect.set({ width: width, height: height });
-        canvas.renderAll();
-    });
-
-    canvas.on('mouse:up', function() {
-        isDrawing = false; // Stop drawing
-    });
-
-
-    // Saving bounding boxes
-    document.getElementById('saveBboxes').addEventListener('click', function() {
-        const bboxes = canvas.getObjects('rect').map(obj => ({
-            x: (obj.left + obj.width / 2) / canvas.width,
-            y: (obj.top + obj.height / 2) / canvas.height,
-            width: obj.width / canvas.width,
-            height: obj.height / canvas.height,
-        }));
-
-        fetch(`/save_bboxes/?imgId=${imgId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCsrfToken(),
-            },
-            body: JSON.stringify({ bboxes: bboxes }),
-        })
-        .then(response => response.json())
-        .then(() => {
-            alert('Label was saved successfully!');
-        })
-        .catch(error => console.error('An error occurred while saving the label:', error));
-    });
-
-    function getCsrfToken() {
-        let csrfToken = null;
-        document.cookie.split(';').forEach(el => {
-            let [k, v] = el.split('=');
-            if (k.trim() === 'csrftoken') csrfToken = v;
+        document.getElementById('redo').addEventListener('click', function() {
+            if (redoStack.length > 0) {
+                history.push(redoStack.pop());
+                canvas.loadFromJSON(history[history.length - 1], canvas.renderAll.bind(canvas));
+            }
         });
-        return csrfToken;
-    }
-});
+
+        function saveState() {
+            history.push(JSON.stringify(canvas));
+            redoStack = [];
+        }
+
+        function getCsrfToken() {
+            let csrfToken = null;
+            document.cookie.split(';').forEach(el => {
+                let [k, v] = el.split('=');
+                if (k.trim() === 'csrftoken') csrfToken = v;
+            });
+            return csrfToken;
+        }
+    });
 </script>
 {% endblock %}

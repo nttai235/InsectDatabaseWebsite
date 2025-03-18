@@ -5,11 +5,14 @@
 #   * Make sure each ForeignKey and OneToOneField has `on_delete` set to the desired behavior
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
+from django.contrib.auth.models import User
 from django.db import models
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.conf import settings
 import os
+
+from django.utils.timezone import now
 
 
 class AuthGroup(models.Model):
@@ -80,6 +83,13 @@ class AuthUserUserPermissions(models.Model):
         db_table = 'auth_user_user_permissions'
         unique_together = (('user', 'permission'),)
 
+class PasswordResetOTP(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)  # Liên kết với user
+    otp = models.CharField(max_length=6)  # Lưu OTP (mã xác thực)
+    created_at = models.DateTimeField(auto_now_add=True)  # Thời gian tạo OTP
+
+    def __str__(self):
+        return f"{self.user.username} - {self.otp}"
 
 class Class(models.Model):
     class_id = models.AutoField(primary_key=True)
@@ -192,7 +202,7 @@ class InsectsBbox(models.Model):
 class InsectsImage(models.Model):
     img_id = models.CharField(primary_key=True, max_length=255)
     url = models.CharField(max_length=255, blank=True, null=True)
-    desc= models.TextField()
+    desc= models.TextField(blank=True, null=True, default=None)
     insects = models.ForeignKey('Species', models.DO_NOTHING, blank=True, null=True)
 
     class Meta:
@@ -271,7 +281,7 @@ class Request(models.Model):
     status = models.CharField(max_length=8, blank=True, null=True)
     verification_count = models.IntegerField(blank=True, null=True)
     # user = models.ForeignKey(AuthUser, models.DO_NOTHING, blank=True, null=True)
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -285,7 +295,7 @@ class RequestDesc(models.Model):
     status = models.CharField(max_length=8, blank=True, null=True)
     verification_count = models.IntegerField(blank=True, null=True)
     # user = models.ForeignKey(AuthUser, models.DO_NOTHING, blank=True, null=True)
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)  # Ngày gửi mô tả
     # approved_at = models.DateTimeField(blank=True, null=True)  # Ngày duyệt mô tả
@@ -319,3 +329,17 @@ class Species(models.Model):
 
     def __str__(self):
         return self.ename
+
+
+class Document(models.Model):
+    doc_id = models.AutoField(primary_key=True)
+    doc_name = models.CharField(max_length=255)
+    url = models.CharField(max_length=500)
+
+    class Meta:
+        managed = False
+        db_table = 'document'
+        verbose_name_plural = "Tài liệu"
+
+    def __str__(self):
+        return self.url

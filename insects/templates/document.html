@@ -1,9 +1,46 @@
 {% extends "template_v2.html" %}
-{% load custom_filters %} 
-
+{% load custom_filters %}
+{% load group_filters %}
 {% block content %}
 <div class="container mt-4">
     <h2>Tài liệu côn trùng</h2>
+
+    {% if request.user.is_authenticated %}
+        {% if request.user|has_group:"CVs" %}
+            <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                <i class="bi bi-upload"></i> Tải lên tài liệu
+            </button>
+        {% endif %}
+    {% endif %}
+
+    <!-- Modal tải lên -->
+    <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="uploadModalLabel">Tải lên tài liệu</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="uploadForm">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Tên tài liệu:</label>
+                            <input type="text" name="doc_name" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Chọn file PDF:</label>
+                            <input type="file" name="doc_file" class="form-control" accept=".pdf" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary">Tải lên</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <form method="GET" class="row mb-3 g-2 align-items-center">
         <label class="fw-bold">Tìm kiếm:</label>
         <div class="col-md-3">
@@ -19,8 +56,16 @@
         <thead class="table-dark">
             <tr>
                 <th scope="col">Tên tài liệu</th>
-                <th scope="col">Xem</th>
-                <th scope="col">Tải xuống</th>
+
+                {% if request.user.is_authenticated %}
+                    {% if request.user|has_group:"CVs" or request.user|has_group:"Admins" %}
+                        <th scope="col" colspan="3" class="text-center">Hành động</th>
+                    {% elif request.user|has_group:"Admins" %}
+                        <th scope="col" colspan="2" class="text-center">Hành động</th>
+                    {% endif %}
+                {% else %}
+                    <th scope="col" colspan="2" class="text-center">Hành động</th>
+                {% endif %}
             </tr>
         </thead>
         <tbody>
@@ -28,15 +73,27 @@
             {% for document in documents %}
             <tr>
                 <td>{{ document.doc_name }}</td>
-                <td>
+                <td class="text-center">
                     <a href="{% url 'view_document' document.doc_id %}">
                         <i class="bi bi-eye"></i>
                     </a>
                 </td>
-                <td><a href="{% url 'download_document' document.doc_id %}">
-                    <i class="bi bi-download"></i>
+                <td class="text-center">
+                    <a href="{% url 'download_document' document.doc_id %}">
+                        <i class="bi bi-download text-success"></i>
                     </a>
                 </td>
+                {% if request.user.is_authenticated %}
+                    {% if request.user|has_group:"Admins" %}
+                        <td class="text-center">
+                            <button class="btn p-0 border-0 bg-transparent delete-btn" data-doc-id="{{ document.doc_id }}"
+                                    data-doc-name="{{ document.doc_name }}" data-bs-toggle="modal"
+                                    data-bs-target="#deleteModal">
+                                <i class="bi bi-trash text-danger"></i>
+                            </button>
+                        </td>
+                    {% endif %}
+                {% endif %}
             </tr>
             {% endfor %}
          {%else%}
@@ -47,4 +104,125 @@
         </tbody>
     </table>
 </div>
+<!-- Modal thông báo -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statusModalLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="statusModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal xác nhận xóa -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Xác nhận xóa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Bạn có chắc chắn muốn xóa tài liệu "<span id="docNameToDelete"></span>" không?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Xóa</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById("uploadForm").addEventListener("submit", function(event) {
+        event.preventDefault();
+
+        var formData = new FormData(this);
+        var statusModal = new bootstrap.Modal(document.getElementById("statusModal"));
+
+        fetch("{% url 'upload_document' %}", {
+            method: "POST",
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("statusModalLabel").textContent = data.success ? "Thành công" : "Lỗi";
+                document.getElementById("statusModalBody").textContent = data.message;
+
+                statusModal.show();
+
+                // Chờ modal mở rồi mới gán sự kiện
+                document.getElementById("statusModal").addEventListener("hidden.bs.modal", function () {
+                    if (data.success) {
+                        location.reload();
+                    }
+                }, { once: true }); // Đảm bảo sự kiện chỉ chạy một lần
+            })
+            .catch(error => {
+                document.getElementById("statusModalLabel").textContent = "Lỗi";
+                document.getElementById("statusModalBody").textContent = "Đã xảy ra lỗi khi tải lên.";
+                statusModal.show();
+            });
+    });
+
+
+    document.addEventListener("DOMContentLoaded", function () {
+        let docIdToDelete = null;
+
+        document.querySelectorAll(".delete-btn").forEach(button => {
+            button.addEventListener("click", function () {
+                let docName = this.getAttribute("data-doc-name");
+                let docId = this.getAttribute("data-doc-id");
+
+                if (docName && docId) {
+                    document.getElementById("docNameToDelete").textContent = docName;
+                    docIdToDelete = docId;
+                }
+            });
+        });
+
+        document.getElementById("confirmDeleteBtn").addEventListener("click", function () {
+            if (docIdToDelete) {
+                fetch(`/delete_document/${docIdToDelete}/`, {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": "{{ csrf_token }}",
+                        "Content-Type": "application/json"
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            document.getElementById("statusModalLabel").textContent = "Xóa thành công";
+                            document.getElementById("statusModalBody").textContent = "Tài liệu đã được xóa thành công.";
+
+                            let statusModal = new bootstrap.Modal(document.getElementById("statusModal"));
+                            statusModal.show();
+
+                            // Sau khi modal đóng thì reload trang
+                            document.getElementById("statusModal").addEventListener("hidden.bs.modal", function () {
+                                location.reload();
+                            }, { once: true });
+
+                            // Đóng modal xác nhận xóa
+                            bootstrap.Modal.getInstance(document.getElementById("deleteModal")).hide();
+                        } else {
+                            alert("Lỗi khi xóa tài liệu!");
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Lỗi:", error);
+                    });
+            }
+        });
+
+    });
+
+</script>
 {% endblock %}

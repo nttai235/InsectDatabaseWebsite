@@ -3,7 +3,7 @@
 <div class="container d-flex justify-content-center align-items-center">
     <form action="{% url 'verify_request' request_item.request_id %}" method="post" class="row justify-content-center col-12 col-md-7" enctype="multipart/form-data">
         {% csrf_token %}
-        <legend class="text-center text-black fw-bold mt-3"><h1>Xác thực đề xuất côn trùng</h1></legend>
+        <legend class="text-center text-black fw-bold mt-3"><h1>Xét duyệt đề xuất côn trùng</h1></legend>
 
         <div class="mb-3">
             <label for="insectEname" class="form-label">Tên khoa học</label>
@@ -44,7 +44,7 @@
         </div>
 
         <div class="d-grid">
-            <button type="submit" class="btn btn-primary pt-3 pb-3">Xác thực</button>
+            <button type="submit" class="btn btn-primary pt-3 pb-3">Xét duyệt</button>
         </div>
     </form>
 </div>

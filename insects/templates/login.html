@@ -13,7 +13,7 @@
     <div class="container d-flex justify-content-center align-items-center">
         <div class="col-10" style="background-color: #202020; padding: 5rem;">
             <div class="row justify-content-center">
-                <form action="" method="post" class="col-12 col-md-7">
+                <form action="" method="post" class="col-12 col-md-7"> 
                     {% csrf_token %}
                     <legend class="text-center text-white fw-bold">Đăng nhập</legend>
                     <div class="form-floating mb-3">
@@ -29,7 +29,7 @@
                     </div>
                     <div class="d-flex justify-content-between my-2">
                         <div class="text-start">
-                            <a href="#  " class="text-white">Quên mật khẩu?</a>
+                            <a href="/password_reset_otp/" class="text-white">Quên mật khẩu?</a>
                         </div>
                         <div class="text-end">
                             Chưa có tài khoản? <a href="/sign_up/" class="text-white">Đăng ký.</a>
@@ -44,20 +44,20 @@
 {% if error %}
 <!-- Modal -->
 <div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="errorModalLabel">Đăng nhập thất bại</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                {{ message }}
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-            </div>
-        </div>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="errorModalLabel">Đăng nhập thất bại</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        {{ message }}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+      </div>
     </div>
+  </div>
 </div>
 
 <!--<script>-->

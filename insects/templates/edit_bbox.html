@@ -1,0 +1,178 @@
+{% extends "template_v2.html" %}
+{% block content %}
+<div class="container d-flex flex-column align-items-center justify-content-center vh-100">
+    <div class="mt-3">
+        <h1>Chỉnh Sửa Bounding Box</h1>
+    </div>
+    <div class="my-3">
+        <canvas id="c" style="border:1px solid #ccc"></canvas>
+    </div>
+    <div>
+        <button id="saveBboxes" class="btn btn-success mt-2">Lưu</button>
+        <button id="deleteAllBboxes" class="btn btn-danger mt-2 ms-2">Xóa tất cả</button>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.3.0/fabric.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const canvasElement = document.getElementById('c');
+        const canvas = new fabric.Canvas(canvasElement, {
+            preserveObjectStacking: true,
+        });
+        let isDown = false;
+        let origX, origY;
+        let rect;
+        const imgId = new URLSearchParams(window.location.search).get('imgId');
+
+        // Convert YOLO format to pixel for display
+        function convertYoloToPixel(x, y, width, height, imgWidth, imgHeight) {
+            const xCenter = x * imgWidth;
+            const yCenter = y * imgHeight;
+            const boxWidth = width * imgWidth;
+            const boxHeight = height * imgHeight;
+            const xTopLeft = xCenter - (boxWidth / 2);
+            const yTopLeft = yCenter - (boxHeight / 2);
+            return { x: xTopLeft, y: yTopLeft, width: boxWidth, height: boxHeight };
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if(e.key === 'Delete'){
+                let activeObject = canvas.getActiveObject();
+                if(activeObject){
+                    canvas.remove(activeObject);
+                    canvas.discardActiveObject().renderAll(); // Deselect and update the canvas
+                }
+            }
+        });
+
+        // Fetch and display image and existing bounding boxes
+        fetch(`/get_image_data/?imgId=${imgId}`)
+            .then(response => response.json())
+            .then(data => {
+                fabric.Image.fromURL(data.url, function(oImg) {
+                    canvas.setWidth(oImg.width);
+                    canvas.setHeight(oImg.height);
+                    oImg.set({ left: 0, top: 0, selectable: false });
+                    canvas.setBackgroundImage(oImg, canvas.renderAll.bind(canvas));
+
+                    // Display existing bounding boxes
+                    data.bboxes.forEach(bbox => {
+                        const { x, y, width, height } = convertYoloToPixel(bbox.x, bbox.y, bbox.width, bbox.height, oImg.width, oImg.height);
+                        let bboxRect = new fabric.Rect({
+                            left: x,
+                            top: y,
+                            width: width,
+                            height: height,
+                            fill: 'transparent',
+                            stroke: 'red',
+                            strokeWidth: 2,
+                            selectable: true,
+                        });
+                        canvas.add(bboxRect);
+                    });
+                });
+            });
+
+        // Drawing new bounding boxes
+        let bboxRect, isDrawing = false;
+        canvas.on('mouse:down', function(o) {
+            if (canvas.getActiveObject()) {
+                // If an existing object is active, we are likely intending to drag, not create a new box
+                isDrawing = false;
+                return;
+            } else {
+                isDrawing = true; // Set to true to enable drawing a new box
+                let pointer = canvas.getPointer(o.e);
+                let origX = pointer.x;
+                let origY = pointer.y;
+                rect = new fabric.Rect({
+                    left: origX,
+                    top: origY,
+                    width: pointer.x - origX,
+                    height: pointer.y - origY,
+                    fill: 'rgba(255, 0, 0, 0.5)',
+                    stroke: 'red',
+                    strokeWidth: 2,
+                });
+                canvas.add(rect);
+            }
+        });
+
+        canvas.on('mouse:down', function(options) {
+            if(options.button === 3){ // Right click
+                let clickedObject = canvas.getActiveObject();
+                if(clickedObject){
+                    canvas.remove(clickedObject);
+                    canvas.discardActiveObject().renderAll(); // Deselect and update the canvas
+                }
+            }
+        });
+
+        canvasElement.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+
+        // Event listener for "Delete All Bounding Boxes" button
+        document.getElementById('deleteAllBboxes').addEventListener('click', function() {
+            canvas.getObjects('rect').forEach(function(obj) {
+                canvas.remove(obj);
+            });
+        });
+
+        canvas.on('mouse:move', function(o) {
+            if (!isDrawing) return;
+            let pointer = canvas.getPointer(o.e);
+            let width = Math.abs(pointer.x - rect.left);
+            let height = Math.abs(pointer.y - rect.top);
+            if (pointer.x < rect.left) {
+                rect.set({ left: pointer.x });
+            }
+            if (pointer.y < rect.top) {
+                rect.set({ top: pointer.y });
+            }
+            rect.set({ width: width, height: height });
+            canvas.renderAll();
+        });
+
+        canvas.on('mouse:up', function() {
+            isDrawing = false; // Stop drawing
+        });
+
+
+        // Saving bounding boxes
+        document.getElementById('saveBboxes').addEventListener('click', function() {
+            const bboxes = canvas.getObjects('rect').map(obj => ({
+                x: (obj.left + obj.width / 2) / canvas.width,
+                y: (obj.top + obj.height / 2) / canvas.height,
+                width: obj.width / canvas.width,
+                height: obj.height / canvas.height,
+            }));
+
+            fetch(`/save_bboxes/?imgId=${imgId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                },
+                body: JSON.stringify({ bboxes: bboxes }),
+            })
+                .then(response => response.json())
+                .then(() => {
+                    alert('Label was saved successfully!');
+                })
+                .catch(error => console.error('An error occurred while saving the label:', error));
+        });
+
+        function getCsrfToken() {
+            let csrfToken = null;
+            document.cookie.split(';').forEach(el => {
+                let [k, v] = el.split('=');
+                if (k.trim() === 'csrftoken') csrfToken = v;
+            });
+            return csrfToken;
+        }
+    });
+</script>
+{% endblock %}

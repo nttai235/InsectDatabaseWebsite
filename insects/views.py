@@ -1,9 +1,15 @@
+import random
 import re
+from itertools import groupby
 
+from django.core.mail import send_mail
 from django.shortcuts import redirect
 from django.conf import settings
-from .models import InsectsImage, Species, InsectsBbox, Genus, RequestDesc, Document, Class, Family, Order, Phylum
-from insects.templatetags.forms import UserEditForm
+from django.utils.crypto import get_random_string
+from pandas.core.interchange.from_dataframe import set_nulls
+
+from .models import InsectsImage, Species, InsectsBbox, Genus, RequestDesc, Document, Class, Family, Order, Phylum, PasswordResetOTP
+from insects.templatetags.forms import UserEditForm, ClassesEditForm, SpeciesEditForm, OrderEditForm, FamilyEditForm, GenusEditForm, InsectsImageForm
 from django.core.paginator import Paginator
 from django.utils.text import slugify
 from django.core.files.base import ContentFile
@@ -27,14 +33,16 @@ from django.shortcuts import render, get_object_or_404
 import os
 # from .excel_export import export_species_data_to_csv
 from .excel_export_1 import export_species_data_to_csv
-from django.core.files.storage import default_storage
+from django.core.files.storage import default_storage, FileSystemStorage
 from django.http import JsonResponse, HttpResponseBadRequest
 from .crawler import download_images, delete_tmp_images, save_images_to_database
 from django.db.models import Q, OuterRef, Subquery
 import uuid
-
+from unidecode import unidecode
 # NQA
 from django.db.models import Count
+
+from .utils import translate_text
 
 
 # End NQA
@@ -159,7 +167,23 @@ def save_bboxes(request):
 
 def annotation(request):
     img_id = request.GET.get('imgId')
-    context = {'img_id': img_id}
+
+    if not img_id:
+        return redirect('labelling')
+
+    image = InsectsImage.objects.filter(img_id=img_id).first()
+    if not image:
+        return JsonResponse({'error': 'Image not found'}, status=404)
+
+    img_url = image.get_absolute_url()
+    bboxes = list(image.bboxes.values('x', 'y', 'width', 'height'))
+
+    context = {
+        'img_id': img_id,
+        'img_url': img_url,
+        'bboxes': bboxes,
+    }
+
     return render(request, 'annotation.html', context)
 
 
@@ -311,7 +335,9 @@ def detail(request, slug):
 
 def load_more_insect_images(request, slug):
     page_number = request.GET.get('page', 1)  # Get the page number from the request
-    species = get_object_or_404(Species, slug=slug)
+    species = Species.objects.filter(slug=slug).first()
+    if not species:
+        return JsonResponse({'error': 'Species not found'}, status=404)
     images = InsectsImage.objects.filter(insects_id=species.insects_id).prefetch_related('bboxes')
     paginator = Paginator(images, 50)  # Create a Paginator object with 50 images per page
     images = paginator.get_page(page_number)  # Get the images for the requested page
@@ -337,8 +363,11 @@ def load_more_insect_images(request, slug):
             'height': img_height,
             'bboxes': bboxes_data,
             'insects': {
+                'id': image.insects.insects_id,
+                'slug': image.insects.slug,
                 'ename': image.insects.name,  # Include the species name
             },
+            'desc': image.desc if image.desc else "",
         }
         images_data.append(image_data)
 
@@ -456,6 +485,88 @@ def logout_view(request):
     # Redirect to homepage or login page after logout
     return redirect('login')
 
+def send_reset_otp(request):
+    error_message = None
+
+    if request.method == "POST":
+        email = request.POST["email"]
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            error_message = "Email chưa được đăng ký. Vui lòng kiểm tra lại."
+        else:
+            otp = random.randint(100000, 999999)
+            PasswordResetOTP.objects.update_or_create(user=user, defaults={"otp": otp})
+            request.session["reset_email"] = email
+
+            send_mail(
+                "Mã OTP đặt lại mật khẩu",
+                f"Mã OTP của bạn là: {otp}",
+                "no-reply@yourdomain.com",
+                [email],
+            )
+
+            return redirect("verify_otp")
+
+    return render(request, "password_reset_otp.html", {"error_message": error_message})
+
+def verify_otp(request):
+    email = request.session.get("reset_email")  # Lấy email từ session
+    error_message = None  # Biến lưu lỗi để hiển thị modal
+
+    if not email:
+        messages.error(request, "Không tìm thấy email. Vui lòng thử lại.")
+        return redirect("send_reset_otp")
+
+    if request.method == "POST":
+        otp = request.POST["otp"]
+
+        try:
+            user = User.objects.get(email=email)  # Lấy user từ email
+            record = PasswordResetOTP.objects.filter(user=user, otp=otp).first()  # Truy vấn bằng user
+        except User.DoesNotExist:
+            return redirect("send_reset_otp")
+
+        if record:
+            messages.success(request, "OTP chính xác. Hãy đặt lại mật khẩu.")
+            request.session["verified_user"] = user.id  # Lưu user ID vào session
+            return redirect("reset_password")  # Chuyển qua trang đặt lại mật khẩu
+        else:
+            error_message = "OTP không chính xác. Vui lòng thử lại."
+
+    return render(request, "verify_otp.html", {"error_message": error_message})
+
+
+def reset_password(request):
+    user_id = request.session.get("verified_user")  # Lấy user ID từ session
+
+    if not user_id:
+        return render(request, "reset_password.html", {"error_message": "Không tìm thấy tài khoản. Vui lòng thử lại."})
+
+    try:
+        user = User.objects.get(id=user_id)  # Lấy user từ ID
+    except User.DoesNotExist:
+        return render(request, "reset_password.html", {"error_message": "Tài khoản không tồn tại."})
+
+    if request.method == "POST":
+        password = request.POST["password"]
+        confirm_password = request.POST["confirm_password"]
+
+        if password != confirm_password:
+            return render(request, "reset_password.html", {"error_message": "Mật khẩu không trùng khớp! Vui lòng thử lại."})
+
+        # Cập nhật mật khẩu cho user
+        user.set_password(password)
+        user.save()
+
+        # Xóa session sau khi đặt lại mật khẩu thành công
+        del request.session["verified_user"]
+        del request.session["reset_email"]
+
+        return render(request, "reset_password.html", {"success_message": "Đặt lại mật khẩu thành công! Hãy đăng nhập lại.", "redirect_url": "login"})
+
+    return render(request, "reset_password.html")
 
 # import_data.html section
 def import_data(request):
@@ -1110,7 +1221,22 @@ def home_view(request):
 
 def home_page(request):
     home_view(request)
+
+    classification = request.GET.get("classification", "")
+    species_id = request.GET.get("species", "")
+
     species_lst = Species.objects.all()
+
+    if classification and species_id:
+        if classification == "class":
+            species_lst = species_lst.filter(genus__family__order__class_field__class_id=species_id)
+        elif classification == "order":
+            species_lst = species_lst.filter(genus__family__order__order_id=species_id)
+        elif classification == "family":
+            species_lst = species_lst.filter(genus__family__family_id=species_id)
+        elif classification == "genus":
+            species_lst = species_lst.filter(genus__genus_id=species_id)
+
     for spc in species_lst:
         # Open the image and get its size
         if spc.thumbnail is None:
@@ -1121,8 +1247,25 @@ def home_page(request):
 
         spc.width = 40
         spc.height = 40
-    return render(request, "home_page.html", {'species_lst': species_lst, 'MEDIA_URL': settings.MEDIA_URL})
+    return render(request, "home_page.html", {
+        "species_lst": species_lst,
+        "MEDIA_URL": settings.MEDIA_URL,
+    })
 
+def get_species_options(request):
+    species_type = request.GET.get("type", "")
+
+    data = []
+    if species_type == "class":
+        data = list(Class.objects.values("class_id", "ename"))
+    elif species_type == "order":
+        data = list(Order.objects.values("order_id", "ename"))
+    elif species_type == "family":
+        data = list(Family.objects.values("family_id", "ename"))
+    elif species_type == "genus":
+        data = list(Genus.objects.values("genus_id", "ename"))
+
+    return JsonResponse({"data": data})
 
 # Description #
 # annotations section
@@ -1342,6 +1485,7 @@ def load_specie_image(request):
 
         image.width = img_width
         image.height = img_height
+        image.desc = image.desc
 
         for bbox in image.bboxes.all():
             bbox.x, bbox.y, bbox.width, bbox.height = convert_yolo_to_pixel(bbox.x, bbox.y, bbox.width, bbox.height,
@@ -1361,7 +1505,6 @@ def document_list(request):
 
     return render(request, 'document.html', {'documents': documents, 'search_query': search_query})
 
-
 def view_document(request, doc_id):
     document = get_object_or_404(Document, doc_id=doc_id)
     return render(request, 'view_document.html', {'document': document, 'MEDIA_URL': settings.MEDIA_URL})
@@ -1372,126 +1515,49 @@ def download_document(request, doc_id):
 
     return FileResponse(open(file_path, 'rb'), as_attachment=True)
 
-#Manage user
-@login_required()
-def manage_user(request):
-    users = User.objects.exclude(id=request.user.id)
-    groups = Group.objects.all()
 
-    #Xử lý tìm kiếm
-    search_query = request.GET.get('search', '').strip()
-    if search_query:
-        users = users.filter(
-            Q(username__icontains=search_query) |
-            Q(first_name__icontains=search_query) |
-            Q(last_name__icontains=search_query)
-        )
+def normalize_filename(filename):
+    name, ext = os.path.splitext(filename)
+    name = unidecode(name)
+    name = re.sub(r"\s+", "_", name)
+    name = re.sub(r"[^a-zA-Z0-9._-]", "", name)
+    return f"{name}{ext}"
 
-    #Xử lý sắp xếp
-    sort_by = request.GET.get('sort', 'username')  # Mặc định sắp xếp theo username
-    sort_order = request.GET.get('order', 'asc')
+def upload_document(request):
+    if request.method == "POST" and request.FILES.get("doc_file"):
+        doc_name = request.POST.get("doc_name")
+        doc_file = request.FILES["doc_file"]
 
-    if sort_by == "group":
-        subquery = Group.objects.filter(user=OuterRef('id')).values('name')[:1]
-        users = users.annotate(group_name=Subquery(subquery))  # Lấy tên nhóm đầu tiên
-        sort_by = "group_name"
+        if not doc_file.name.endswith(".pdf"):
+            return JsonResponse({"success": False, "message": "Chỉ chấp nhận file PDF."})
 
-    if sort_order == 'desc':
-        users = users.order_by(f'-{sort_by}')
-    else:
-        users = users.order_by(sort_by)
+        try:
+            normalized_filename = doc_file.name.replace(" ", "_")  # Chuẩn hóa tên file
+            file_name = f"documents/{normalized_filename}"
+            file_path = default_storage.save(file_name, ContentFile(doc_file.read()))
 
-    #Xử lý lọc
-    filter_group = request.GET.get('group', '')
-    if filter_group:
-        users = users.filter(groups__name=filter_group)
+            Document.objects.create(doc_name=doc_name, url=file_path)
 
-    filter_last_login = request.GET.get('last_login', '')
-    if filter_last_login:
-        users = users.filter(last_login__date=filter_last_login)
+            return JsonResponse({"success": True, "message": "Tải lên tài liệu thành công!"})
 
-    return render(request, 'manage_user.html', {
-        'users': users,
-        'groups': groups,
-        'search_query': search_query,
-        'sort_by': sort_by,
-        'sort_order': sort_order,
-        'filter_group': filter_group,
-        'filter_last_login': filter_last_login
-    })
+        except Exception as e:
+            return JsonResponse({"success": False, "message": f"Lỗi: {str(e)}"})
 
-@login_required()
-def add_user(request):
+    return JsonResponse({"success": False, "message": "Tải lên thất bại."})
+
+def delete_document(request, doc_id):
     if request.method == "POST":
-        username = request.POST.get("username")
-        first_name = request.POST.get("first_name")
-        last_name = request.POST.get("last_name")
-        email = request.POST.get("email")
-        password = request.POST.get("password")
-        user_group = request.POST.get("user_group")
+        document = get_object_or_404(Document, doc_id=doc_id)
 
-        if User.objects.filter(username=username).exists():
-            messages.error(request, "Người dùng đã tồn tại!")
-        elif User.objects.filter(email=email).exists():
-            messages.error(request, "Email đã được người dùng khác đăng ký!")
-        else:
-            user = User.objects.create(
-                username=username,
-                first_name=first_name,
-                last_name=last_name,
-                email=email,
-                password=make_password(password),
-                is_active=True
-            )
+        if document.url:
+            file_path = os.path.join(default_storage.location, document.url)
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
-            if user_group:
-                group = Group.objects.get(name=user_group)
-                user.groups.add(group)
-                if group.name == "Admins":
-                    user.is_staff = True
-                    user.save()
+        document.delete()
+        return JsonResponse({"success": True})
 
-            messages.success(request, "Thêm người dùng thành công!")
-        return redirect("add_user")
-
-        # Lấy danh sách group để hiển thị trong form
-    groups = Group.objects.all()
-    return render(request, "add_user.html", {"groups": groups})
-
-@login_required
-def edit_user(request, user_id):
-    user = get_object_or_404(User, id=user_id)
-    success = False
-
-    if request.method == "POST":
-        form = UserEditForm(request.POST, instance=user)
-        if form.is_valid():
-            user = form.save(commit=False)
-            user.groups.clear()
-
-            if form.cleaned_data['groups']:
-                selected_group = form.cleaned_data['groups']
-                user.groups.set([selected_group])
-                if selected_group.name == "Admins":
-                    user.is_staff = True
-                else:
-                    user.is_staff = False
-            user.save()
-            success = True
-    else:
-        form = UserEditForm(instance=user)
-
-    return render(request, 'edit_user.html', {'form': form, 'user': user, 'success': success})
-
-@login_required()
-def delete_user(request, user_id):
-    user = get_object_or_404(User, id=user_id)
-
-    if request.method == "POST":
-        user.delete()
-        messages.success(request, f"Đã xóa người dùng {user.username} thành công!")
-
-    return redirect('manage_user')
+    return JsonResponse({"success": False, "message": "Phương thức không hợp lệ!"})
 
 #account_info
 @login_required()
@@ -1750,6 +1816,127 @@ def species_by_genus_chart(request):
     }
     return JsonResponse(response_data)
 
+#Manage user
+@login_required()
+def manage_user(request):
+    users = User.objects.exclude(id=request.user.id)
+    groups = Group.objects.all()
+
+    #Xử lý tìm kiếm
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        users = users.filter(
+            Q(username__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query)
+        )
+
+    #Xử lý sắp xếp
+    sort_by = request.GET.get('sort', 'username')  # Mặc định sắp xếp theo username
+    sort_order = request.GET.get('order', 'asc')
+
+    if sort_by == "group":
+        subquery = Group.objects.filter(user=OuterRef('id')).values('name')[:1]
+        users = users.annotate(group_name=Subquery(subquery))  # Lấy tên nhóm đầu tiên
+        sort_by = "group_name"
+
+    if sort_order == 'desc':
+        users = users.order_by(f'-{sort_by}')
+    else:
+        users = users.order_by(sort_by)
+
+    #Xử lý lọc
+    filter_group = request.GET.get('group', '')
+    if filter_group:
+        users = users.filter(groups__name=filter_group)
+
+    filter_last_login = request.GET.get('last_login', '')
+    if filter_last_login:
+        users = users.filter(last_login__date=filter_last_login)
+
+    return render(request, 'manage_user.html', {
+        'users': users,
+        'groups': groups,
+        'search_query': search_query,
+        'sort_by': sort_by,
+        'sort_order': sort_order,
+        'filter_group': filter_group,
+        'filter_last_login': filter_last_login
+    })
+
+@login_required()
+def add_user(request):
+    if request.method == "POST":
+        username = request.POST.get("username")
+        first_name = request.POST.get("first_name")
+        last_name = request.POST.get("last_name")
+        email = request.POST.get("email")
+        password = request.POST.get("password")
+        user_group = request.POST.get("user_group")
+
+        if User.objects.filter(username=username).exists():
+            messages.error(request, "Người dùng đã tồn tại!")
+        elif User.objects.filter(email=email).exists():
+            messages.error(request, "Email đã được người dùng khác đăng ký!")
+        else:
+            user = User.objects.create(
+                username=username,
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                password=make_password(password),
+                is_active=True
+            )
+
+            if user_group:
+                group = Group.objects.get(name=user_group)
+                user.groups.add(group)
+                if group.name == "Admins":
+                    user.is_staff = True
+                    user.save()
+
+            messages.success(request, "Thêm người dùng thành công!")
+        return redirect("add_user")
+
+        # Lấy danh sách group để hiển thị trong form
+    groups = Group.objects.all()
+    return render(request, "add_user.html", {"groups": groups})
+
+@login_required
+def edit_user(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+    success = False
+
+    if request.method == "POST":
+        form = UserEditForm(request.POST, instance=user)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.groups.clear()
+
+            if form.cleaned_data['groups']:
+                selected_group = form.cleaned_data['groups']
+                user.groups.set([selected_group])
+                if selected_group.name == "Admins":
+                    user.is_staff = True
+                else:
+                    user.is_staff = False
+            user.save()
+            success = True
+    else:
+        form = UserEditForm(instance=user)
+
+    return render(request, 'edit_user.html', {'form': form, 'user': user, 'success': success})
+
+@login_required()
+def delete_user(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+
+    if request.method == "POST":
+        user.delete()
+        messages.success(request, f"Đã xóa người dùng {user.username} thành công!")
+
+    return redirect('manage_user')
+
 # manage insect
 @login_required()
 def manage_insect(request):
@@ -1810,3 +1997,488 @@ def manage_insect(request):
         'search_species_query': search_species_query,
         'MEDIA_URL': settings.MEDIA_URL
     })
+
+# =======Add=======
+# Add class
+@login_required()
+def add_class(request):
+    if request.method == "POST":
+        ename = request.POST.get("ename")
+        name = request.POST.get("name")
+        phylum_id = request.POST.get("phylum")
+
+        if Class.objects.filter(ename=ename).exists():
+            messages.error(request, "Lớp đã tồn tại!")
+        else:
+            try:
+                phy = Phylum.objects.get(pk=phylum_id)
+            except Phylum.DoesNotExist:
+                messages.error(request, "Ngành không tồn tại!")
+                return redirect("add_class")
+
+            slug = f"class_{ename.replace(' ', '_')}"
+
+            classes = Class.objects.create(
+                ename=ename,
+                name=name,
+                slug = slug,
+                phylum=phy,
+            )
+
+            messages.success(request, "Thêm lớp thành công!")
+        return redirect("add_class")
+
+    phylum = Phylum.objects.all()
+    return render(request, "add_class.html", {"phylum": phylum})
+
+#======================Add=========================
+# Add order
+@login_required()
+def add_order(request):
+    if request.method == "POST":
+        ename = request.POST.get("ename")
+        name = request.POST.get("name")
+        class_id = request.POST.get("classes")
+
+        if Order.objects.filter(ename=ename).exists():
+            messages.error(request, "Bộ đã tồn tại!")
+        else:
+            try:
+                classes = Class.objects.get(pk=class_id)
+            except Class.DoesNotExist:
+                messages.error(request, "Lớp không tồn tại!")
+                return redirect("add_order")
+
+            slug = f"order_{ename.replace(' ', '_')}"
+
+            order = Order.objects.create(
+                ename=ename,
+                name=name,
+                slug = slug,
+                class_field=classes,
+            )
+
+            messages.success(request, "Thêm bộ thành công!")
+        return redirect("add_order")
+
+    classes = Class.objects.all()
+    return render(request, "add_order.html", {"classes": classes})
+
+# Add family
+@login_required()
+def add_family(request):
+    if request.method == "POST":
+        ename = request.POST.get("ename")
+        name = request.POST.get("name")
+        order_id = request.POST.get("order")
+
+        if Family.objects.filter(ename=ename).exists():
+            messages.error(request, "Họ đã tồn tại!")
+        else:
+            try:
+                order = Order.objects.get(pk=order_id)
+            except Order.DoesNotExist:
+                messages.error(request, "Bộ không tồn tại!")
+                return redirect("add_family")
+
+            slug = f"family_{ename.replace(' ', '_')}"
+
+            family = Family.objects.create(
+                ename=ename,
+                name=name,
+                slug = slug,
+                order=order,
+            )
+
+            messages.success(request, "Thêm họ thành công!")
+        return redirect("add_family")
+
+    order = Order.objects.all()
+    return render(request, "add_family.html", {"order": order})
+
+# Add genus
+@login_required()
+def add_genus(request):
+    if request.method == "POST":
+        ename = request.POST.get("ename")
+        name = request.POST.get("name")
+        family_id = request.POST.get("family")
+
+        if Genus.objects.filter(ename=ename).exists():
+            messages.error(request, "Chi đã tồn tại!")
+        else:
+            try:
+                family = Family.objects.get(pk=family_id)
+            except Family.DoesNotExist:
+                messages.error(request, "Họ không tồn tại!")
+                return redirect("add_family")
+
+            slug = f"genus_{ename.replace(' ', '_')}"
+
+            genus = Genus.objects.create(
+                ename=ename,
+                name=name,
+                slug = slug,
+                family=family,
+            )
+
+            messages.success(request, "Thêm chi thành công!")
+        return redirect("add_family")
+
+    family = Family.objects.all()
+    return render(request, "add_genus.html", {"family": family})
+
+# Add species
+@login_required()
+def add_species(request):
+    if request.method == "POST":
+        ename = request.POST.get("ename")
+        name = request.POST.get("name")
+        species_name = request.POST.get("speciesName")
+        eng_name = request.POST.get("engName")
+        vi_name = request.POST.get("viName")
+        morphologic_feature = request.POST.get("morphologicFeature")
+        distribution = request.POST.get("distribution")
+        characteristic = request.POST.get("characteristic")
+        behavior = request.POST.get("behavior")
+        protection_method = request.POST.get("protectionMethod")
+        genus_id = request.POST.get("genus")
+
+        if Species.objects.filter(ename=ename).exists():
+            messages.error(request, "Loài đã tồn tại!")
+        else:
+            try:
+                genus = Genus.objects.get(pk=genus_id)
+            except Genus.DoesNotExist:
+                messages.error(request, "Chi không tồn tại!")
+                return redirect("add_species")
+
+            slug = f"species_{ename.replace(' ', '_')}"
+
+            thumbnail = None  # Định nghĩa biến từ đầu
+            if request.FILES.get("thumbnail"):  # Nếu có file ảnh
+                file = request.FILES["thumbnail"]
+                fs = FileSystemStorage(location="media/thumbnails/")
+                filename = fs.save(file.name, file)
+                thumbnail = f"thumbnails/{filename}"
+
+            species = Species.objects.create(
+                ename=ename,
+                name=name,
+                species_name = species_name,
+                eng_name = eng_name,
+                vi_name = vi_name,
+                slug = slug,
+                morphologic_feature = morphologic_feature,
+                distribution = distribution,
+                characteristic = characteristic,
+                behavior = behavior,
+                protection_method = protection_method,
+                genus = genus,
+                thumbnail= thumbnail,
+            )
+
+            messages.success(request, "Thêm loài thành công!")
+        return redirect("add_species")
+
+    genus = Genus.objects.all()
+    return render(request, "add_species.html", {"genus": genus})
+
+# ======Delete=====
+# Delete class
+@login_required()
+def delete_class(request, class_id):
+    classes = get_object_or_404(Class, class_id=class_id)
+
+    if Order.objects.filter(class_field=classes).exists():
+        messages.error(request, f"Không thể xóa lớp {classes.ename}! Hãy xóa các bộ thuộc lớp {classes.ename} trước khi xóa lớp này!")
+        return redirect("manage_insect")
+
+    if request.method == "POST":
+        classes.delete()
+        messages.success(request, f"Đã xóa lớp {classes.ename} thành công!")
+
+    return redirect('manage_insect')
+
+# Delete class
+@login_required()
+def delete_order(request, order_id):
+    order = get_object_or_404(Order, order_id=order_id)
+
+    if Family.objects.filter(order=order).exists():
+        messages.error(request, f"Không thể xóa bộ {order.ename}! Hãy xóa các họ thuộc bộ {order.ename} trước khi xóa bộ này!")
+        return redirect("manage_insect")
+
+    if request.method == "POST":
+        order.delete()
+        messages.success(request, f"Đã xóa bộ {order.ename} thành công!")
+
+    return redirect('manage_insect')
+
+# Delete family
+@login_required()
+def delete_family(request, family_id):
+    family = get_object_or_404(Family, family_id=family_id)
+
+    if Genus.objects.filter(family=family).exists():
+        messages.error(request, f"Không thể xóa họ {family.ename}! Hãy xóa các chi thuộc họ {family.ename} trước khi xóa họ này!")
+        return redirect("manage_insect")
+
+    if request.method == "POST":
+        family.delete()
+        messages.success(request, f"Đã xóa họ {family.ename} thành công!")
+
+    return redirect('manage_insect')
+
+# Delete genus
+@login_required()
+def delete_genus(request, genus_id):
+    genus = get_object_or_404(Genus, genus_id=genus_id)
+
+    if Species.objects.filter(genus=genus).exists():
+        messages.error(request, f"Không thể xóa chi {genus.ename}! Hãy xóa các loài thuộc chi {genus.ename} trước khi xóa chi này!")
+        return redirect("manage_insect")
+
+    if request.method == "POST":
+        genus.delete()
+        messages.success(request, f"Đã xóa chi {genus.ename} thành công!")
+
+    return redirect('manage_insect')
+
+# Delete species
+@login_required()
+def delete_species(request, insects_id):
+    species = get_object_or_404(Species, insects_id=insects_id)
+
+    if InsectsImage.objects.filter(insects=species).exists():
+        messages.error(request, f"Không thể xóa loài {species.ename}!")
+        return redirect("manage_insect")
+
+    if species.thumbnail:
+        thumbnail_path = os.path.join(settings.MEDIA_ROOT, species.thumbnail)
+        if os.path.exists(thumbnail_path):
+            os.remove(thumbnail_path)
+
+    if request.method == "POST":
+        species.delete()
+        messages.success(request, f"Đã xóa loài {species.ename} thành công!")
+
+    return redirect('manage_insect')
+
+#=========================Edit=========================
+# Edit class
+@login_required()
+def edit_class(request, class_id):
+    classes = get_object_or_404(Class, class_id=class_id)
+    success = False
+
+    if request.method == "POST":
+        form = ClassesEditForm(request.POST, instance=classes)
+        if form.is_valid():
+            form.save()
+            success = True
+    else:
+        form = ClassesEditForm(instance=classes)
+
+    return render(request, 'edit_class.html', {'form': form, 'success': success})
+
+# Edit order
+@login_required()
+def edit_order(request, order_id):
+    order = get_object_or_404(Order, order_id=order_id)
+    success = False
+
+    if request.method == "POST":
+        form = OrderEditForm(request.POST, instance=order)
+        if form.is_valid():
+            form.save()
+            success = True
+    else:
+        form = OrderEditForm(instance=order)
+
+    return render(request, 'edit_order.html', {'form': form, 'success': success})
+
+# Edit order
+@login_required()
+def edit_family(request, family_id):
+    family = get_object_or_404(Family, family_id=family_id)
+    success = False
+
+    if request.method == "POST":
+        form = FamilyEditForm(request.POST, instance=family)
+        if form.is_valid():
+            form.save()
+            success = True
+    else:
+        form = FamilyEditForm(instance=family)
+
+    return render(request, 'edit_family.html', {'form': form, 'success': success})
+
+# Edit genus
+@login_required()
+def edit_genus(request, genus_id):
+    genus = get_object_or_404(Genus, genus_id=genus_id)
+    success = False
+
+    if request.method == "POST":
+        form = GenusEditForm(request.POST, instance=genus)
+        if form.is_valid():
+            form.save()
+            success = True
+    else:
+        form = GenusEditForm(instance=genus)
+
+    return render(request, 'edit_genus.html', {'form': form, 'success': success})
+
+# Edit species
+@login_required()
+def edit_species(request, insects_id):
+    species = get_object_or_404(Species, insects_id=insects_id)
+    old_thumbnail = species.thumbnail
+    success = False
+    if request.method == "POST":
+        form = SpeciesEditForm(request.POST, request.FILES, instance=species)
+        if form.is_valid():
+            instance = form.save(commit=False)
+            if request.FILES.get("thumbnail"):
+                file = request.FILES["thumbnail"]
+                fs = FileSystemStorage(location=os.path.join(settings.MEDIA_ROOT, "thumbnails/"))
+                filename = fs.save(file.name, file)
+                instance.thumbnail = f"thumbnails/{filename}"
+
+                if old_thumbnail:
+                    old_thumbnail_path = os.path.join(settings.MEDIA_ROOT, old_thumbnail)
+                    if os.path.exists(old_thumbnail_path):
+                        os.remove(old_thumbnail_path)
+
+            else:
+                instance.thumbnail = old_thumbnail
+
+            instance.save()
+            success = True
+    else:
+        form = SpeciesEditForm(instance=species)
+
+    return render(request, 'edit_species.html', {'form': form, 'success': success})
+
+# Manage insect image desc
+@login_required()
+def manage_image_desc(request):
+    images_list = InsectsImage.objects.select_related("insects").all()
+    species_filter = request.GET.get("species", "")
+
+    if species_filter:
+        images_list = images_list.filter(insects__insects_id=species_filter)
+
+    paginator = Paginator(images_list, 30)
+    page_number = request.GET.get("page")
+    images = paginator.get_page(page_number)
+
+    species_list = Species.objects.all()
+
+    success = False
+
+    if request.method == "POST":
+        img_id = request.POST.get("img_id")
+        image = get_object_or_404(InsectsImage, img_id=img_id)
+        form = InsectsImageForm(request.POST, instance=image)
+
+        if form.is_valid():
+            form.save()
+            success = True
+
+    else:
+        form = InsectsImageForm()
+
+    return render(request, 'manage_image_desc.html', {
+        'images': images,
+        'form': form,
+        'success': success,
+        'species_list': species_list,
+        'selected_species': species_filter,
+    })
+
+@login_required
+def manage_label_n_bbox(request):
+    # Lấy danh sách loài
+    species_list = Species.objects.all()
+
+    # Lọc hình ảnh chưa có bounding box cho tab "Gán nhãn"
+    images_without_bbox = InsectsImage.objects.select_related("insects").filter(bboxes__isnull=True).order_by("img_id", "pk")
+    selected_species_add = request.GET.get("species_add", "")
+    if selected_species_add:
+        images_without_bbox = images_without_bbox.filter(insects__insects_id=selected_species_add)
+
+    # Phân trang hình ảnh chưa có bounding box
+    paginator_images = Paginator(images_without_bbox, 30)
+    page_number_images = request.GET.get("page_images")
+    images_without_bbox_paginated = paginator_images.get_page(page_number_images)
+
+    # Lọc hình ảnh có bounding boxes cho tab "Chỉnh sửa nhãn"
+    images_with_bbox = InsectsImage.objects.filter(bboxes__isnull=False).distinct().order_by("img_id")
+
+    selected_species_edit = request.GET.get("species_edit", "")
+    if selected_species_edit:
+        images_with_bbox = images_with_bbox.filter(insects__insects_id=selected_species_edit)
+
+    # Phân trang theo hình ảnh (mỗi trang 30 ảnh)
+    paginator_bbox_images = Paginator(images_with_bbox, 30)
+    page_number_bbox = request.GET.get("page_bbox")
+    bboxes_images_paginated = paginator_bbox_images.get_page(page_number_bbox)
+
+    # Lấy danh sách bounding box theo hình ảnh sau khi phân trang
+    bbox_list = InsectsBbox.objects.select_related("img__insects").filter(img__in=bboxes_images_paginated).order_by("img__img_id", "box_id")
+
+    # Nhóm bounding box theo hình ảnh
+    grouped_bboxes = {}
+    for img, boxes in groupby(bbox_list, key=lambda x: x.img):
+        grouped_bboxes[img] = list(boxes)
+
+    return render(request, 'manage_label_n_bbox.html', {
+        'bboxes_grouped': grouped_bboxes,
+        'species_list': species_list,
+        'selected_species_add': selected_species_add,
+        'selected_species_edit': selected_species_edit,
+        'images_without_bbox': images_without_bbox_paginated,
+        'bboxes_images_paginated': bboxes_images_paginated,
+    })
+
+def manage_image(request):
+    species_list = Species.objects.all()
+
+    species_filter = request.GET.get("species_filter", "")
+
+    if species_filter:
+        images = InsectsImage.objects.filter(insects__insects_id=species_filter)
+    else:
+        images = InsectsImage.objects.all()
+
+    images = images.order_by("img_id")
+
+    paginator_images = Paginator(images, 30)
+    page_number_images = request.GET.get("page_images")
+    images = paginator_images.get_page(page_number_images)
+
+    return render(request, 'manage_image.html', {
+        'images': images,
+        'species_list': species_list,
+        'selected_species_filter': species_filter,
+    })
+
+def delete_image(request, img_id):
+    if request.method == "POST":
+        try:
+            image = get_object_or_404(InsectsImage, img_id=img_id)
+            image_path = os.path.join(settings.MEDIA_ROOT, image.url)
+
+            image.delete()
+
+            if os.path.exists(image_path):
+                os.remove(image_path)
+
+            return JsonResponse({"success": True, "message": "Ảnh đã được xóa thành công!"})
+
+        except Exception as e:
+            return JsonResponse({"success": False, "message": f"Lỗi khi xóa ảnh: {str(e)}"})
+
+    return JsonResponse({"success": False, "message": "Lỗi! Không thể xóa ảnh."}, status=400)

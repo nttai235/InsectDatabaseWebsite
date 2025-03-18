@@ -38,7 +38,11 @@
             <div class="col-md-9">
                 <p class="fw-bold fs-3">Mô tả ảnh</p>
                 <hr>
-                <p>{{img_info.desc|linebreaksbr}}</p>
+                {% if img_info.desc %}
+                    <p>{{ img_info.desc|linebreaksbr }}</p>
+                {% else %}
+                    <p>Không có mô tả</p>
+                {% endif %}
                 <hr>
                 <form action="{% url 'append_desc_handler' img_info.img_id %}" method="post" class="row justify-content-center col-12 col-md-7" enctype="multipart/form-data">
                         {% csrf_token %}
@@ -53,14 +57,18 @@
                             <button type="submit" class="btn btn-primary pt-3 pb-3">Thêm mô tả mới</button>
                         </div>
                 </form>
-                 <p class="fw-bold fs-3">Your History Description</p>
-                {%for request in request_desc %}
-                 <hr>
-                    <p>Your Description: {{request.desc|linebreaksbr}}</p>
-                    <p>Submitted At: {{ request.created_at|date:"Y-m-d H:i:s" }}</p>
-                    <p>Status: {{request.status|format_status}}</p>
-                <hr>
-                {%endfor%}
+                <p class="fw-bold fs-3">Lịch sử đóng góp mô tả</p>
+                {% if request_desc %}
+                    {% for request in request_desc %}
+                        <hr>
+                            <p>Mô tả: {{request.desc|linebreaksbr}}</p>
+                            <p>Thời gian gửi: {{ request.created_at|date:"Y-m-d H:i:s" }}</p>
+                            <p>Trạng thái: {{request.status|format_status}}</p>
+                        <hr>
+                    {% endfor %}
+                {% else %}
+                    <p>Không có lịch sử đóng góp mô tả.</p>
+                {% endif %}
             </div>
  {% if messages %}
  {% for message in messages %}

@@ -1,0 +1,74 @@
+{% extends "template_v2.html" %}
+{% load class_filters %}
+
+{% block content %}
+<div class="container d-flex justify-content-center">
+    <div style="max-width: 600px; width: 100%;">
+        <h2 class="mb-4 pt-3 text-center">Chỉnh sửa thông tin lớp</h2>
+        <form method="POST">
+        {% csrf_token %}
+        <div class="row mb-3">
+            <label class="col-md-3 col-form-label fw-bold">Mã lớp</label>
+            <div class="col-md-9">
+                <input type="text" class="form-control-plaintext" name="class_id" value="{{ form.instance.class_id }}" readonly>
+            </div>
+        </div>
+        <div class="row mb-3">
+            <label class="col-md-3 col-form-label fw-bold">Tên khoa học</label>
+            <div class="col-md-9">
+                {{ form.ename|add_class:"form-control" }}
+            </div>
+        </div>
+        <div class="row mb-3">
+            <label class="col-md-3 col-form-label fw-bold">Tên</label>
+            <div class="col-md-9">
+                {{ form.name|add_class:"form-control" }}
+            </div>
+        </div>
+        <div class="row mb-3">
+            <label class="col-md-3 col-form-label fw-bold">Ngành</label>
+            <div class="col-md-9">
+                {{ form.phylum }}
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end">
+            <a href="{% url 'manage_insect' %}" class="btn btn-secondary me-2">Hủy</a>
+            <button type="submit" class="btn btn-primary">Lưu</button>
+        </div>
+    </form>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="successModalLabel">Cập nhật thành công</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Thông tin lớp được cập nhật thành công!
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="closeModalBtn">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if success %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var successModal = new bootstrap.Modal(document.getElementById('successModal'));
+        successModal.show();
+
+        document.getElementById("closeModalBtn").addEventListener("click", function() {
+            window.location.href = "{% url 'manage_insect' %}";
+        });
+    });
+</script>
+{% endif %}
+
+{% endblock %}

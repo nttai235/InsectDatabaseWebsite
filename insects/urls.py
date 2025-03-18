@@ -21,6 +21,7 @@ register_converter(SlugWithParenthesesConverter, 'customslug')
 urlpatterns = [
     #path('', views.home_view, name='home_view'),
     path('', views.home_page, name='home_page'),
+    path("get_species_options/", views.get_species_options, name="get_species_options"),
     path('show_insect_images/', views.show_insect_images, name='show_insect_images'),
     path('load_more_images/', views.load_more_images, name='load_more_images'),
     path('detail/<customslug:slug>/', views.detail, name='detail'),
@@ -30,11 +31,35 @@ urlpatterns = [
     path('image_search/', views.image_search, name='image_search'),
     path('search_by_image/', views.search_by_image, name='search_by_image'),
     path('export_data/', views.export_data, name='export_data'),
+    # document
     path('document/', views.document_list, name='document_list'),
+    path('upload_document/', views.upload_document, name='upload_document'),
     path('view_document/<int:doc_id>/', views.view_document, name='view_document'),
     path('download/<int:doc_id>/', views.download_document, name='download_document'),
+    path("delete_document/<int:doc_id>/", views.delete_document, name="delete_document"),
     # manage insect
     path('manage_insect/', views.manage_insect, name='manage_insect'),
+    path('manage_insect/add_class/', views.add_class, name='add_class'),
+    path('manage_insect/add_order/', views.add_order, name='add_order'),
+    path('manage_insect/add_family/', views.add_family, name='add_family'),
+    path('manage_insect/add_genus/', views.add_genus, name='add_genus'),
+    path('manage_insect/add_species/', views.add_species, name='add_species'),
+    path('manage_insect/delete_class/<int:class_id>/', views.delete_class, name='delete_class'),
+    path('manage_insect/delete_order/<int:order_id>/', views.delete_order, name='delete_order'),
+    path('manage_insect/delete_family/<int:family_id>/', views.delete_family, name='delete_family'),
+    path('manage_insect/delete_genus/<int:genus_id>/', views.delete_genus, name='delete_genus'),
+    path('manage_insect/delete_species/<int:insects_id>/', views.delete_species, name='delete_species'),
+    path('manage_insect/edit_species/<int:insects_id>/', views.edit_species, name='edit_species'),
+    path('manage_insect/edit_class/<int:class_id>/', views.edit_class, name='edit_class'),
+    path('manage_insect/edit_order/<int:order_id>/', views.edit_order, name='edit_order'),
+    path('manage_insect/edit_family/<int:family_id>/', views.edit_family, name='edit_family'),
+    path('manage_insect/edit_genus/<int:genus_id>/', views.edit_genus, name='edit_genus'),
+
+    #magege_image
+    path("manage_image/", views.manage_image, name="manage_image"),
+    path("manage_label_n_bbox/", views.manage_label_n_bbox, name="manage_label_n_bbox"),
+    path("manage_image_desc/", views.manage_image_desc, name="manage_image_desc"),
+    path("delete_image/<str:img_id>/", views.delete_image, name="delete_image"),
     #manage_account
     path('account_info/', views.account_info, name='account_info'),
     path('edit_account/', views.edit_account, name='edit_account'),
@@ -52,6 +77,10 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     # sign up
     path('sign_up/', views.sign_up, name='sign_up'),
+    # forgot password
+    path("password_reset_otp/", views.send_reset_otp, name="password_reset_otp"),
+    path("verify_otp/", views.verify_otp, name="verify_otp"),
+    path("reset_password/", views.reset_password, name="reset_password"),
     # folder upload
     path('upload_folder_zip/', views.upload_folder_zip, name='upload_folder_zip'),
     # statistics
@@ -113,6 +142,7 @@ urlpatterns = [
     path('api/species_images/<str:lookup>/', views.species_images),
     path('api/species_images_bbox/<int:id>/', views.species_images_bbox),
     path('api/bbox_details/<str:img_id>/', views.bbox_details, name='bbox_details'),
+
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

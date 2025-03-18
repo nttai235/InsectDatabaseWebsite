@@ -13,7 +13,7 @@
     <div class="container d-flex justify-content-center align-items-center">
         <div class="col-10" style="background-color: #202020; padding: 5rem;">
             <div class="row justify-content-center">
-                <form action="" method="post" class="col-12 col-md-7">
+                <form action="" method="post" class="col-12 col-md-7"> 
                     {% csrf_token %}
                     <legend class="text-center text-white fw-bold">Đăng ký</legend>
                     <div class="d-flex gap-3 mb-3">
@@ -37,11 +37,11 @@
                     <div class="form-floating mb-3">
                         <input type="password" class="form-control" id="password" name="password" placeholder="Nhập mật khẩu">
                         <label for="password">Mật khẩu</label>
-                    </div>
+                    </div>  
                     <div class="form-floating mb-3">
                         <input type="password" class="form-control" id="repassword" name="repassword" placeholder="Nhập lại mật khẩu">
                         <label for="repassword">Xác nhận mật khẩu</label>
-                    </div>
+                    </div>  
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary pt-3 pb-3">Đăng ký</button>
                     </div>
